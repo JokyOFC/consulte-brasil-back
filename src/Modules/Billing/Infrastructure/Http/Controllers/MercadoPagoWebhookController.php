@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Billing\Infrastructure\Http\Controllers;
 
+use Dedoc\Scramble\Attributes\ExcludeAllRoutesFromDocs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,7 @@ use Src\Modules\Billing\Application\UseCase\HandleMercadoPagoWebhook;
  * auth:api): a autenticidade é garantida pela validação da assinatura
  * x-signature (HMAC do segredo do webhook).
  */
+#[ExcludeAllRoutesFromDocs]
 final class MercadoPagoWebhookController
 {
     public function __invoke(Request $request, HandleMercadoPagoWebhook $handler): JsonResponse
