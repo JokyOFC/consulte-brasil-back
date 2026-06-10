@@ -2,6 +2,7 @@
 
 use App\Providers\AppServiceProvider;
 use App\Providers\FortifyServiceProvider;
+use App\Providers\MailServiceProvider;
 use App\Providers\ScrambleServiceProvider;
 use Src\Modules\Audit\Infrastructure\AuditServiceProvider;
 use Src\Modules\Billing\Infrastructure\BillingServiceProvider;
@@ -14,6 +15,7 @@ return [
     AppServiceProvider::class,
     ScrambleServiceProvider::class,
     FortifyServiceProvider::class,
+    MailServiceProvider::class,
 
     // Kernel compartilhado + módulos (bounded contexts).
     SharedServiceProvider::class,

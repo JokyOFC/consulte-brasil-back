@@ -56,6 +56,7 @@ composer ci:check    # ESLint, Prettier, TypeScript e testes
 
 Copie `.env.example` para `.env` e configure conforme o ambiente:
 
+- **MAIL_*** — envio de e-mails transacionais (`MAIL_MAILER=log` em desenvolvimento grava no log)
 - **APP_*** — aplicação Laravel
 - **API_BRASIL_*** — provedor [API Brasil](https://doc.apibrasil.io)
 - **CPFCNPJ_*** — provedor [CPF.CNPJ](https://www.cpfcnpj.com.br/dev)

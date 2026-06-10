@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Src\Modules\Billing\Application\Port\CreditBalanceCache;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
-use Src\Modules\Billing\Infrastructure\Gateway\MercadoPago\MercadoPagoGateway;
+use Src\Modules\Billing\Domain\Event\PaymentSettled;
 use Src\Modules\Billing\Domain\Repository\CreditTransactionRepository;
 use Src\Modules\Billing\Domain\Repository\InvoiceRepository;
 use Src\Modules\Billing\Domain\Repository\PaymentRepository;
@@ -19,7 +19,9 @@ use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Billing\Infrastructure\Cache\CacheCreditBalanceCache;
 use Src\Modules\Billing\Infrastructure\Console\ReconcileBalancesCommand;
 use Src\Modules\Billing\Infrastructure\Console\RunRecurringBillingCommand;
+use Src\Modules\Billing\Infrastructure\Gateway\MercadoPago\MercadoPagoGateway;
 use Src\Modules\Billing\Infrastructure\Listeners\ProvisionWalletForAccount;
+use Src\Modules\Billing\Infrastructure\Listeners\SendPaymentConfirmedEmail;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\EloquentCreditTransactionRepository;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\EloquentInvoiceRepository;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\EloquentPaymentRepository;
@@ -67,6 +69,7 @@ final class BillingServiceProvider extends ServiceProvider
 
         // Integração Identity → Billing: provisiona a carteira ao registrar a conta.
         Event::listen(AccountRegistered::class, ProvisionWalletForAccount::class);
+        Event::listen(PaymentSettled::class, SendPaymentConfirmedEmail::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

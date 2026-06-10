@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Src\Modules\Billing\Application\UseCase;
 
-use DateTimeImmutable;
 use Src\Modules\Billing\Application\DTO\GrantCreditsInput;
 use Src\Modules\Billing\Domain\Entity\Payment;
+use Src\Modules\Billing\Domain\Event\PaymentSettled;
 use Src\Modules\Billing\Domain\Repository\InvoiceRepository;
 use Src\Modules\Billing\Domain\Repository\PaymentRepository;
 use Src\Modules\Billing\Domain\Repository\PlanRepository;
 use Src\Modules\Billing\Domain\Repository\SubscriptionRepository;
 use Src\Modules\Billing\Domain\ValueObject\PaymentType;
 use Src\Shared\Application\Contracts\Clock;
+use Src\Shared\Application\Contracts\EventBus;
 use Src\Shared\Application\Contracts\TransactionManager;
 
 /**
@@ -36,25 +37,37 @@ final readonly class SettleApprovedPayment
         private GrantCredits $grantCredits,
         private TransactionManager $tx,
         private Clock $clock,
+        private EventBus $events,
     ) {}
 
     public function handle(Payment $payment): void
     {
-        $this->tx->transactional(function () use ($payment): void {
+        // Webhook pode atualizar o status antes de chamar settle; paidAt indica liquidação concluída.
+        if ($payment->paidAt !== null) {
+            return;
+        }
+
+        $creditsGranted = $this->tx->transactional(function () use ($payment): int {
             $payment->markApproved($this->clock->now());
             $this->payments->save($payment);
 
             if ($payment->type === PaymentType::Topup) {
-                $this->depositTopup($payment);
-
-                return;
+                return $this->depositTopup($payment);
             }
 
-            $this->settleInvoice($payment);
+            return $this->settleInvoice($payment);
         });
+
+        $this->events->publish(new PaymentSettled(
+            paymentId: $payment->id,
+            accountId: $payment->accountId,
+            type: $payment->type,
+            amountCents: $payment->amountCents,
+            creditsGranted: $creditsGranted,
+        ));
     }
 
-    private function depositTopup(Payment $payment): void
+    private function depositTopup(Payment $payment): int
     {
         $this->grantCredits->handle(new GrantCreditsInput(
             accountId: $payment->accountId,
@@ -64,20 +77,19 @@ final readonly class SettleApprovedPayment
             idempotencyKey: "settle:{$payment->id}",
             metadata: ['payment_id' => $payment->id, 'method' => $payment->method->value],
         ));
+
+        return $payment->amountCents;
     }
 
-    private function settleInvoice(Payment $payment): void
+    private function settleInvoice(Payment $payment): int
     {
         if ($payment->invoiceId === null) {
-            // Sem fatura vinculada: trata como recarga avulsa do valor pago.
-            $this->depositTopup($payment);
-
-            return;
+            return $this->depositTopup($payment);
         }
 
         $invoice = $this->invoices->findById($payment->invoiceId);
         if ($invoice === null) {
-            return;
+            return 0;
         }
 
         if ($invoice->isPayable()) {
@@ -85,7 +97,6 @@ final readonly class SettleApprovedPayment
             $this->invoices->save($invoice);
         }
 
-        // Recarga do plano (valor creditado na carteira a cada ciclo).
         $rechargeCents = $invoice->amountCents;
         $subscription = $invoice->subscriptionId !== null
             ? $this->subscriptions->findById($invoice->subscriptionId)
@@ -117,5 +128,7 @@ final readonly class SettleApprovedPayment
             $subscription->reactivate();
             $this->subscriptions->save($subscription);
         }
+
+        return $rechargeCents;
     }
 }
