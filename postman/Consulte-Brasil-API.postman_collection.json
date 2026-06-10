@@ -1,0 +1,215 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "Consulte Brasil API",
+		"description": "API pública do Consulte Brasil (v1).\n\nAutentique com `Authorization: Bearer {sua_chave}` nas rotas protegidas.\n\nVariáveis da collection:\n- `baseUrl` — URL base da API (padrão: http://localhost/api/v1)\n- `api_key` — sua chave de API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{api_key}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost/api/v1"
+		},
+		{
+			"key": "api_key",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "Sistema",
+			"description": "Endpoints de saúde e metadados da API.",
+			"item": [
+				{
+					"name": "Health check",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/ping",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"description": "Retorna status, nome do serviço e versão da API. Útil para monitoramento e testes de conectividade."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Conta",
+			"description": "Informações da conta autenticada pela chave de API.",
+			"item": [
+				{
+					"name": "Dados da conta",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"me"
+							]
+						},
+						"description": "Retorna os dados da conta associada à chave de API usada na requisição. Útil para validar autenticação após gerar uma nova chave."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Consultas",
+			"description": "Execução de consultas de dados (CPF, CNPJ, etc.).",
+			"item": [
+				{
+					"name": "Consultar CPF",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"params\": {\n    \"document\": \"11144477735\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/consult/cpf",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"consult",
+								"cpf"
+							]
+						},
+						"description": "Executa uma consulta de CPF. O corpo deve conter um objeto `params` com o campo `document` (somente números)."
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar CNPJ",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"params\": {\n    \"document\": \"12345678000199\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/consult/cnpj",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"consult",
+								"cnpj"
+							]
+						},
+						"description": "Executa uma consulta de CNPJ. O corpo deve conter um objeto `params` com o campo `document` (somente números)."
+					},
+					"response": []
+				},
+				{
+					"name": "Executar consulta (genérico)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"params\": {\n    \"document\": \"11144477735\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/consult/:queryType",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"consult",
+								":queryType"
+							],
+							"variable": [
+								{
+									"key": "queryType",
+									"value": "cpf",
+									"description": "Código do tipo de consulta (ex.: cpf, cnpj, credito)."
+								}
+							]
+						},
+						"description": "Executa uma consulta do tipo informado na URL. Altere o parâmetro `queryType` conforme o tipo desejado."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,29 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Consulte Brasil">
+  <defs>
+    <linearGradient id="cbGradient" x1="24" y1="40" x2="232" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#009C3B"/>
+      <stop offset="0.5" stop-color="#FFDF00"/>
+      <stop offset="1" stop-color="#1B4DB1"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#cbGradient)" stroke-width="4" fill="none" stroke-linecap="round">
+    <circle cx="128" cy="128" r="104"/>
+    <ellipse cx="128" cy="128" rx="44" ry="104"/>
+    <ellipse cx="128" cy="128" rx="84" ry="104"/>
+    <ellipse cx="128" cy="128" rx="104" ry="44"/>
+    <ellipse cx="128" cy="128" rx="104" ry="84"/>
+    <path d="M40 86 C 90 110, 166 110, 216 86"/>
+    <path d="M40 170 C 90 146, 166 146, 216 170"/>
+  </g>
+  <g fill="url(#cbGradient)">
+    <circle cx="128" cy="24" r="7"/>
+    <circle cx="128" cy="232" r="7"/>
+    <circle cx="24" cy="128" r="7"/>
+    <circle cx="232" cy="128" r="7"/>
+    <circle cx="72" cy="72" r="6"/>
+    <circle cx="184" cy="184" r="6"/>
+    <circle cx="184" cy="72" r="6"/>
+    <circle cx="72" cy="184" r="6"/>
+    <circle cx="128" cy="128" r="7"/>
+  </g>
+</svg>
