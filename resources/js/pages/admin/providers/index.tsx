@@ -1,9 +1,8 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ChevronDown, FlaskConical, LineChart, Pencil, Plus, Power, Server } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { formatBRL } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -20,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePageFlash } from '@/hooks/use-page-flash';
+import { formatBRL } from '@/lib/format';
 
 const MARKUP = 1.1;
 
@@ -366,12 +366,14 @@ function EditProviderDialog({ provider }: { provider: ProviderRow }) {
     const [open, setOpen] = useState(false);
     const form = useForm(providerFormDefaults(provider));
 
-    useEffect(() => {
-        if (open) {
+    const handleOpenChange = (next: boolean) => {
+        if (next) {
             form.setData(providerFormDefaults(provider));
             form.clearErrors();
         }
-    }, [open, provider]);
+
+        setOpen(next);
+    };
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -385,7 +387,7 @@ function EditProviderDialog({ provider }: { provider: ProviderRow }) {
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
                     <Pencil className="size-4" />
@@ -500,12 +502,14 @@ function CapabilityDialog({
     const [open, setOpen] = useState(false);
     const form = useForm(capabilityDefaults(capability));
 
-    useEffect(() => {
-        if (open) {
+    const handleOpenChange = (next: boolean) => {
+        if (next) {
             form.setData(capabilityDefaults(capability));
             form.clearErrors();
         }
-    }, [open, capability]);
+
+        setOpen(next);
+    };
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -527,13 +531,14 @@ function CapabilityDialog({
     // Ao informar o custo do provedor, sugere o preço de venda (custo + 10%).
     const onCostChange = (value: string) => {
         form.setData('cost_reais', value);
+
         if (value !== '' && !Number.isNaN(Number(value))) {
             form.setData('price_reais', (Number(value) * MARKUP).toFixed(2));
         }
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {trigger ?? (
                     <Button variant="outline" size="sm">

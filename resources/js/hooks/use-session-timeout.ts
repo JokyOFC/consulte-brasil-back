@@ -43,15 +43,18 @@ export function useSessionTimeout(): void {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
             }
+
             timerRef.current = setTimeout(expire, timeoutMs);
         };
 
         // Throttle: só re-arma o timer no máximo uma vez por segundo.
         const onActivity = () => {
             const now = Date.now();
+
             if (now - lastResetRef.current < 1_000) {
                 return;
             }
+
             lastResetRef.current = now;
             arm();
         };
@@ -63,6 +66,7 @@ export function useSessionTimeout(): void {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
             }
+
             ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, onActivity));
         };
     }, [isAuthenticated, minutes]);

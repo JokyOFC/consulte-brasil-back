@@ -1,7 +1,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { CircleDollarSign, FileWarning, Receipt, Repeat, TrendingUp, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
-import { formatDateTime, Pagination, type Paginator } from '@/components/pagination';
+import { formatDateTime, Pagination  } from '@/components/pagination';
+import type {Paginator} from '@/components/pagination';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

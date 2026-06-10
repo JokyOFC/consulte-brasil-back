@@ -155,14 +155,20 @@ function PaymentResult({ payment }: { payment: PendingPayment }) {
         if (status === 'approved' || payment.method === 'credit_card') {
             return;
         }
+
         const timer = setInterval(async () => {
             try {
                 const res = await fetch(`/client/billing/payments/${payment.id}/status`, {
                     headers: { Accept: 'application/json' },
                 });
-                if (!res.ok) return;
+
+                if (!res.ok) {
+return;
+}
+
                 const data = (await res.json()) as { status: string };
                 setStatus(data.status);
+
                 if (data.status === 'approved') {
                     clearInterval(timer);
                     router.reload({ only: ['wallet', 'invoices', 'payments', 'transactions'] });
@@ -741,12 +747,17 @@ function SubscribeDialog({
         [plans, form.data.plan_id],
     );
 
-    useEffect(() => {
-        if (dialogOpen) {
-            form.setData('plan_id', initialPlanId ?? plans[0]?.id ?? '');
+    const handleDialogOpenChange = (next: boolean) => {
+        if (next) {
+            form.setData({
+                plan_id: initialPlanId ?? plans[0]?.id ?? '',
+                method: 'pix',
+            });
             setMethod('pix');
         }
-    }, [dialogOpen, initialPlanId, plans]);
+
+        setDialogOpen(next);
+    };
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -760,7 +771,7 @@ function SubscribeDialog({
     const methodLabel = PAYMENT_METHODS.find((option) => option.id === method)?.label ?? method;
 
     return (
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
                 <div className="border-b border-border bg-gradient-to-br from-brand-green/10 via-transparent to-transparent px-6 py-5">
@@ -1034,7 +1045,10 @@ function TransactionsCard({ rows }: { rows: Transaction[] }) {
 }
 
 function formatDateTime(value: string | null): string {
-    if (!value) return '—';
+    if (!value) {
+return '—';
+}
+
     const d = new Date(value.replace(' ', 'T'));
 
     return Number.isNaN(d.getTime()) ? value : d.toLocaleString('pt-BR');

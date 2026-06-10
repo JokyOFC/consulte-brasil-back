@@ -364,9 +364,17 @@ function subscriptionStatusLabel(status: string): string {
 }
 
 function paymentMethodLabel(method: string | null): string {
-    if (method === 'credit_card') return 'Cartão';
-    if (method === 'pix') return 'PIX';
-    if (method === 'boleto') return 'Boleto';
+    if (method === 'credit_card') {
+return 'Cartão';
+}
+
+    if (method === 'pix') {
+return 'PIX';
+}
+
+    if (method === 'boleto') {
+return 'Boleto';
+}
 
     return method ?? '—';
 }
