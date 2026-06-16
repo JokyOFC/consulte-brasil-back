@@ -22,13 +22,14 @@ final class MercadoPagoWebhookController
 
     public function __invoke(Request $request, HandleMercadoPagoWebhook $handler): JsonResponse
     {
-        $type = (string) ($request->input('type') ?? $request->query('type') ?? $request->query('topic') ?? '');
-        $dataId = (string) (
-            $request->input('data.id')
-            ?? $request->query('data_id')
-            ?? $request->query('id')
+        $type = (string) (
+            $request->input('type')
+            ?? $request->input('action')
+            ?? $request->query('type')
+            ?? $request->query('topic')
             ?? ''
         );
+        $dataId = $this->resolveDataId($request);
 
         if ($dataId === '') {
             return response()->json(['received' => true]);
@@ -83,5 +84,25 @@ final class MercadoPagoWebhookController
         $expected = hash_hmac('sha256', $manifest, $secret);
 
         return hash_equals($expected, $v1);
+    }
+
+    private function resolveDataId(Request $request): string
+    {
+        $fromBody = $request->input('data.id');
+        if (is_string($fromBody) && $fromBody !== '') {
+            return $fromBody;
+        }
+
+        $data = $request->input('data');
+        if (is_array($data) && isset($data['id'])) {
+            return (string) $data['id'];
+        }
+
+        $fromQuery = $request->query('data_id') ?? $request->query('id');
+        if (is_string($fromQuery) && $fromQuery !== '') {
+            return $fromQuery;
+        }
+
+        return '';
     }
 }

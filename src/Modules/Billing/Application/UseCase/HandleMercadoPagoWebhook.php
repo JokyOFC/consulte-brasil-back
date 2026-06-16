@@ -6,6 +6,7 @@ namespace Src\Modules\Billing\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Domain\Exception\PaymentGatewayError;
 use Src\Modules\Billing\Domain\Entity\Invoice;
 use Src\Modules\Billing\Domain\Entity\InvoiceItem;
 use Src\Modules\Billing\Domain\Entity\Payment;
@@ -54,7 +55,25 @@ final readonly class HandleMercadoPagoWebhook
             return;
         }
 
-        $status = $this->gateway->getPayment($dataId);
+        if ($this->isTestNotification($dataId)) {
+            $this->logger->info('mp.webhook.test_notification', ['data_id' => $dataId]);
+
+            return;
+        }
+
+        try {
+            $status = $this->gateway->getPayment($dataId);
+        } catch (PaymentGatewayError $e) {
+            // Falha ao reconsultar no MP (ex.: ping de teste com ID fictício).
+            // Retornamos 200 para o MP não ficar reenviando indefinidamente.
+            $this->logger->warning('mp.webhook.payment_fetch_failed', [
+                'data_id' => $dataId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
         $mpStatus = PaymentStatus::fromMercadoPago($status->status);
 
         $existing = $this->payments->findByMpPaymentId($dataId);
@@ -131,5 +150,11 @@ final readonly class HandleMercadoPagoWebhook
         if ($mpStatus === PaymentStatus::Approved) {
             $this->settle->handle($payment);
         }
+    }
+
+    /** IDs usados pelo painel do Mercado Pago ao testar a URL do webhook. */
+    private function isTestNotification(string $dataId): bool
+    {
+        return in_array($dataId, ['123456', '123456789'], true);
     }
 }

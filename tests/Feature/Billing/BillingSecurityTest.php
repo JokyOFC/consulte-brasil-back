@@ -163,6 +163,22 @@ final class BillingSecurityTest extends TestCase
         ], $headers)->assertOk()->assertJson(['received' => true]);
     }
 
+    public function test_webhook_accepts_mercado_pago_panel_test_payload(): void
+    {
+        config(['services.mercado_pago.webhook_secret' => '']);
+
+        $this->postJson('/api/v1/webhooks/mercadopago', [
+            'action' => 'payment.updated',
+            'api_version' => 'v1',
+            'data' => ['id' => '123456'],
+            'date_created' => '2021-11-01T02:02:02Z',
+            'id' => '123456',
+            'live_mode' => false,
+            'type' => 'payment',
+            'user_id' => 3463407079,
+        ])->assertOk()->assertJson(['received' => true]);
+    }
+
     /** @return array<string, string> */
     private function mercadoPagoSignatureHeaders(string $dataId, string $secret, ?int $ts = null): array
     {
