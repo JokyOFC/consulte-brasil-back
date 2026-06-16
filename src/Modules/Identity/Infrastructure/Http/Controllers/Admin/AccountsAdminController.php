@@ -269,6 +269,8 @@ final class AccountsAdminController
 
     public function adjustCredits(string $accountId, Request $request, AdjustCredits $adjust): RedirectResponse
     {
+        AccountModel::query()->findOrFail($accountId);
+
         $data = $request->validate([
             'delta' => ['required', 'integer', 'not_in:0'],
             'reason' => ['required', 'string', 'max:255'],
@@ -288,8 +290,10 @@ final class AccountsAdminController
 
     public function assignPlan(string $accountId, Request $request, AssignPlanToAccount $assign): RedirectResponse
     {
+        AccountModel::query()->findOrFail($accountId);
+
         $data = $request->validate([
-            'plan_id' => ['required', 'string'],
+            'plan_id' => ['required', 'string', 'exists:plans,id'],
         ]);
 
         $assign->handle($accountId, $data['plan_id']);

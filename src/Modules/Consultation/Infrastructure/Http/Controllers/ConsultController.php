@@ -235,7 +235,7 @@ DESC,
             ],
         ]],
     )]
-    #[Response(status: 402, description: 'Créditos insuficientes na conta')]
+    #[Response(status: 402, description: 'Saldo insuficiente na carteira')]
     #[Response(status: 422, description: 'Tipo de consulta inválido ou parâmetros incorretos')]
     #[Response(status: 503, description: 'Nenhum provedor disponível para o tipo solicitado')]
     public function __invoke(
@@ -263,6 +263,7 @@ DESC,
                 'amount_charged_formatted' => 'R$ '.number_format($output->creditsCharged / 100, 2, ',', '.'),
                 // Mantido por compatibilidade: mesmo valor em centavos.
                 'credits_charged' => $output->creditsCharged,
+                'from_cache' => $output->fromCache,
                 'data' => $output->data,
             ],
         ]);

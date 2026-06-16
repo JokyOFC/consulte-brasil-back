@@ -8,8 +8,10 @@ use Src\Modules\Billing\Application\DTO\ReserveCreditsInput;
 use Src\Modules\Billing\Application\UseCase\CommitCredits;
 use Src\Modules\Billing\Application\UseCase\RefundCredits;
 use Src\Modules\Billing\Application\UseCase\ReserveCredits;
+use Src\Modules\Consultation\Application\DTO\CachedConsultationResult;
 use Src\Modules\Consultation\Application\DTO\ExecuteConsultationInput;
 use Src\Modules\Consultation\Application\DTO\ExecuteConsultationOutput;
+use Src\Modules\Consultation\Application\Port\ConsultationResultCache;
 use Src\Modules\Consultation\Application\Service\ProviderRouter;
 use Src\Modules\Consultation\Domain\Entity\Consultation;
 use Src\Modules\Consultation\Domain\Exception\AllProvidersFailed;
@@ -26,10 +28,11 @@ use Src\Shared\Application\Contracts\IdGenerator;
 /**
  * Orquestrador do fluxo completo de uma consulta:
  *
- *   1. Reserva créditos (lança InsufficientCredits → 402 na borda HTTP).
- *   2. Roteia para o melhor provedor (failover via ProviderRouter).
- *   3a. Sucesso  → COMMIT da reserva + grava consultation(status=success).
- *   3b. Falha total → REFUND da reserva + grava consultation(status=refunded), rethrow.
+ *   1. Reserva saldo (lança InsufficientCredits → 402 na borda HTTP).
+ *   2. Tenta cache (mesmo tipo + parâmetros + escopo do provedor).
+ *   3. Senão, roteia para o melhor provedor (failover via ProviderRouter).
+ *   4a. Sucesso  → COMMIT da reserva + grava consultation(status=success).
+ *   4b. Falha total → REFUND da reserva + grava consultation(status=refunded), rethrow.
  *
  * Garante que o cliente NUNCA é cobrado por falha do provedor.
  */
@@ -38,6 +41,7 @@ final readonly class ExecuteConsultation
     public function __construct(
         private QueryTypeCatalog $catalog,
         private ProviderRouter $router,
+        private ConsultationResultCache $resultCache,
         private ReserveCredits $reserve,
         private CommitCredits $commit,
         private RefundCredits $refund,
@@ -57,6 +61,9 @@ final readonly class ExecuteConsultation
         }
 
         $request = new ConsultationRequest($type, $input->params);
+        $fingerprint = $request->fingerprint();
+        $cacheScope = $this->resolveCacheScope($type);
+        $cacheTtl = $this->catalog->cacheTtlSeconds($type);
 
         // Preço de venda em centavos (R$): usa o preço configurado na
         // capability do provedor primário (maior prioridade); se não houver
@@ -81,11 +88,24 @@ final readonly class ExecuteConsultation
             status: Consultation::STATUS_FAILED,
             creditCost: $creditCost,
             reservationId: $reservation->reservationId,
-            requestHash: $request->fingerprint(),
+            requestHash: $fingerprint,
             latencyMs: null,
             httpStatus: null,
             createdAt: $this->clock->now(),
         );
+
+        $cached = $cacheTtl > 0
+            ? $this->resultCache->get($cacheScope, $type->code, $fingerprint)
+            : null;
+
+        if ($cached !== null) {
+            return $this->completeFromCache(
+                consultation: $consultation,
+                reservationId: $reservation->reservationId,
+                cached: $cached,
+                creditCost: $creditCost,
+            );
+        }
 
         try {
             $startedAt = microtime(true);
@@ -97,6 +117,20 @@ final readonly class ExecuteConsultation
 
             $this->commit->handle($reservation->reservationId);
             $this->consultations->save($consultation);
+
+            if ($cacheTtl > 0) {
+                $this->resultCache->put(
+                    scope: $cacheScope,
+                    queryType: $type->code,
+                    fingerprint: $fingerprint,
+                    result: new CachedConsultationResult(
+                        providerIdentifier: $result->meta->providerIdentifier,
+                        data: $result->data,
+                        httpStatus: $result->meta->httpStatus,
+                    ),
+                    ttlSeconds: $cacheTtl,
+                );
+            }
 
             return new ExecuteConsultationOutput(
                 consultationId: $consultation->id,
@@ -113,6 +147,27 @@ final readonly class ExecuteConsultation
         }
     }
 
+    private function completeFromCache(
+        Consultation $consultation,
+        string $reservationId,
+        CachedConsultationResult $cached,
+        int $creditCost,
+    ): ExecuteConsultationOutput {
+        $providerEntity = $this->providers->findByIdentifier($cached->providerIdentifier);
+        $consultation->markSuccess($providerEntity?->id, 0, $cached->httpStatus);
+
+        $this->commit->handle($reservationId);
+        $this->consultations->save($consultation);
+
+        return new ExecuteConsultationOutput(
+            consultationId: $consultation->id,
+            providerIdentifier: $cached->providerIdentifier,
+            data: $cached->data,
+            creditsCharged: $creditCost,
+            fromCache: true,
+        );
+    }
+
     /**
      * Preço de venda da consulta, em centavos de BRL. Prioriza o preço da
      * capability do provedor primário (configurável pelo admin na tela de
@@ -127,5 +182,18 @@ final readonly class ExecuteConsultation
         }
 
         return $this->catalog->defaultCreditCost($type);
+    }
+
+    private function resolveCacheScope(QueryType $type): string
+    {
+        $candidates = $this->registry->enabledFor($type->code);
+
+        if ($candidates === []) {
+            return 'production';
+        }
+
+        $provider = $this->providers->findByIdentifier($candidates[0]->identifier);
+
+        return $provider?->environment->value ?? 'production';
     }
 }

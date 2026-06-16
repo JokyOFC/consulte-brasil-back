@@ -86,7 +86,7 @@ final class RequestLoggingTest extends TestCase
         $log = RequestLogModel::query()->where('path', '/api/v1/consult/cpf')->first();
 
         $this->assertNotNull($log);
-        $this->assertSame('11144477735', $log->body['params']['document'] ?? null);
+        $this->assertSame('***', $log->body['params']['document'] ?? null);
         $this->assertSame('***', $log->body['password'] ?? null);
         $this->assertFalse($log->success);
         $this->assertSame(402, $log->status_code);

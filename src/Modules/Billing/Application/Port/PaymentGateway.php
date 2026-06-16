@@ -30,4 +30,11 @@ interface PaymentGateway
 
     /** Public key do ambiente atual (para o Bricks/MP.js no front). */
     public function publicKey(): ?string;
+
+    /**
+     * Preapproval com cartão (assinatura automática). No sandbox do MP o
+     * endpoint falha com "Card token service not found"; nesse caso usamos
+     * cobrança avulsa + faturas manuais.
+     */
+    public function supportsAutomaticCardRecurring(): bool;
 }

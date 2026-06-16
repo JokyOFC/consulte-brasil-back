@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Src\Modules\Provider\Infrastructure\Http\Controllers\Admin;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Src\Modules\Provider\Application\UseCase\FetchProviderBalance;
 use Src\Modules\Provider\Domain\Entity\Provider;
 use Src\Modules\Provider\Domain\Repository\ProviderRepository;
 use Src\Modules\Provider\Domain\ValueObject\ProviderEnvironment;
@@ -19,29 +22,38 @@ use Src\Shared\Application\Contracts\IdGenerator;
 
 final class ProvidersAdminController
 {
+    private const BALANCE_CACHE_SECONDS = 120;
+
+    public function __construct(private readonly FetchProviderBalance $fetchBalance) {}
+
     public function index(): Response
     {
+        $queryTypeNames = DB::table('query_types')->pluck('name', 'code');
+
         $providers = ProviderModel::query()
             ->orderBy('name')
             ->get()
-            ->map(function (ProviderModel $p) {
+            ->map(function (ProviderModel $p) use ($queryTypeNames) {
                 $credentials = $p->credentials ?? [];
                 $deviceTokens = (array) ($credentials['device_tokens'] ?? []);
 
                 $capabilities = ProviderCapabilityModel::query()
                     ->where('provider_id', $p->id)
                     ->get()
-                    ->map(fn (ProviderCapabilityModel $c) => [
-                        'query_type' => $c->query_type,
-                        'priority' => $c->priority,
-                        'price_cents' => $c->price_cents,
-                        'cost_cents' => $c->cost_cents,
-                        'enabled' => (bool) $c->enabled,
-                        'endpoint' => $c->config['endpoint'] ?? null,
-                        'body_key' => $c->config['body_key'] ?? null,
-                        // Nunca expomos o device token; apenas se existe.
-                        'has_device_token' => filled($deviceTokens[$c->query_type] ?? null),
-                    ])
+                    ->map(function (ProviderCapabilityModel $c) use ($queryTypeNames, $deviceTokens) {
+                        return [
+                            'query_type' => $c->query_type,
+                            'query_type_name' => $queryTypeNames[$c->query_type] ?? null,
+                            'priority' => $c->priority,
+                            'price_cents' => $c->price_cents,
+                            'cost_cents' => $c->cost_cents,
+                            'enabled' => (bool) $c->enabled,
+                            'endpoint' => $c->config['endpoint'] ?? null,
+                            'body_key' => $c->config['body_key'] ?? null,
+                            // Nunca expomos o device token; apenas se existe.
+                            'has_device_token' => filled($deviceTokens[$c->query_type] ?? null),
+                        ];
+                    })
                     ->all();
 
                 return [
@@ -54,6 +66,7 @@ final class ProvidersAdminController
                     'has_token' => filled($credentials['token'] ?? null),
                     'has_sandbox_token' => filled($credentials['sandbox_token'] ?? null),
                     'capabilities' => $capabilities,
+                    'balance' => $this->cachedBalance((string) $p->identifier),
                 ];
             })
             ->all();
@@ -125,7 +138,35 @@ final class ProvidersAdminController
             'daily' => $this->dailySeries($providerId, $costByType),
             'by_type' => $this->byType($providerId, $costByType),
             'recent' => $this->recentLogs($providerId),
+            'balance' => $this->cachedBalance((string) $provider->identifier),
         ]);
+    }
+
+    public function balance(string $providerId): JsonResponse
+    {
+        $provider = ProviderModel::find($providerId);
+        abort_if($provider === null, 404);
+
+        Cache::forget($this->balanceCacheKey((string) $provider->identifier));
+
+        return response()->json([
+            'balance' => $this->cachedBalance((string) $provider->identifier),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function cachedBalance(string $identifier): array
+    {
+        return Cache::remember(
+            $this->balanceCacheKey($identifier),
+            self::BALANCE_CACHE_SECONDS,
+            fn (): array => $this->fetchBalance->forIdentifier($identifier)->toArray(),
+        );
+    }
+
+    private function balanceCacheKey(string $identifier): string
+    {
+        return "provider_balance:{$identifier}";
     }
 
     /**

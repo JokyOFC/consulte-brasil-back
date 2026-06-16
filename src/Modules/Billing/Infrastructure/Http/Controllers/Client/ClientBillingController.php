@@ -115,17 +115,19 @@ final class ClientBillingController
 
     public function topup(Request $request, CreateWalletTopup $topup): RedirectResponse
     {
+        $accountId = $this->requireAccountId($request);
+
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
             'method' => ['required', 'in:pix,boleto,credit_card'],
-            'card_token' => ['nullable', 'string'],
+            'card_token' => ['required_if:method,credit_card', 'nullable', 'string'],
             'installments' => ['nullable', 'integer', 'min:1'],
-            'payment_method_id' => ['nullable', 'string'],
+            'payment_method_id' => ['required_if:method,credit_card', 'nullable', 'string'],
             'issuer_id' => ['nullable', 'string'],
         ]);
 
         $payment = $topup->handle(new CreateWalletTopupInput(
-            accountId: $request->user()->account_id,
+            accountId: $accountId,
             amountCents: (int) round(((float) $data['amount']) * 100),
             method: PaymentMethod::from($data['method']),
             payerEmail: (string) $request->user()->email,
@@ -141,16 +143,19 @@ final class ClientBillingController
 
     public function payInvoice(Request $request, PayInvoice $payInvoice): RedirectResponse
     {
+        $accountId = $this->requireAccountId($request);
+
         $data = $request->validate([
             'invoice_id' => ['required', 'string'],
             'method' => ['required', 'in:pix,boleto,credit_card'],
-            'card_token' => ['nullable', 'string'],
+            'card_token' => ['required_if:method,credit_card', 'nullable', 'string'],
             'installments' => ['nullable', 'integer', 'min:1'],
-            'payment_method_id' => ['nullable', 'string'],
+            'payment_method_id' => ['required_if:method,credit_card', 'nullable', 'string'],
             'issuer_id' => ['nullable', 'string'],
         ]);
 
         $payment = $payInvoice->handle(new PayInvoiceInput(
+            accountId: $accountId,
             invoiceId: $data['invoice_id'],
             method: PaymentMethod::from($data['method']),
             payerEmail: (string) $request->user()->email,
@@ -166,19 +171,27 @@ final class ClientBillingController
 
     public function subscribe(Request $request, SubscribeToPlan $subscribe): RedirectResponse
     {
+        $accountId = $this->requireAccountId($request);
+
         $data = $request->validate([
             'plan_id' => ['required', 'string'],
             'method' => ['required', 'in:pix,boleto,credit_card'],
-            'card_token' => ['nullable', 'string'],
+            'card_token' => ['required_if:method,credit_card', 'nullable', 'string'],
+            'installments' => ['nullable', 'integer', 'min:1'],
+            'payment_method_id' => ['required_if:method,credit_card', 'nullable', 'string'],
+            'issuer_id' => ['nullable', 'string'],
         ]);
 
         $result = $subscribe->handle(new SubscribeToPlanInput(
-            accountId: $request->user()->account_id,
+            accountId: $accountId,
             planId: $data['plan_id'],
             method: PaymentMethod::from($data['method']),
             payerEmail: (string) $request->user()->email,
             backUrl: route('client.billing.index'),
             cardToken: $data['card_token'] ?? null,
+            installments: (int) ($data['installments'] ?? 1),
+            paymentMethodId: $data['payment_method_id'] ?? null,
+            issuerId: $data['issuer_id'] ?? null,
         ));
 
         $response = back()->with('success', 'Assinatura criada.');
@@ -190,9 +203,9 @@ final class ClientBillingController
         return $response;
     }
 
-    public function cancelSubscription(string $subscriptionId, CancelSubscription $cancel): RedirectResponse
+    public function cancelSubscription(string $subscriptionId, Request $request, CancelSubscription $cancel): RedirectResponse
     {
-        $cancel->handle($subscriptionId);
+        $cancel->handle($subscriptionId, $this->requireAccountId($request));
 
         return back()->with('success', 'Assinatura cancelada.');
     }
@@ -200,7 +213,7 @@ final class ClientBillingController
     public function changeSubscription(string $subscriptionId, Request $request, ChangeSubscription $change): RedirectResponse
     {
         $data = $request->validate(['plan_id' => ['required', 'string']]);
-        $change->handle($subscriptionId, $data['plan_id']);
+        $change->handle($subscriptionId, $this->requireAccountId($request), $data['plan_id']);
 
         return back()->with('success', 'Plano alterado.');
     }
@@ -235,5 +248,13 @@ final class ClientBillingController
             'barcode' => $payment->barcode,
             'expires_at' => $payment->expiresAt?->format('c'),
         ];
+    }
+
+    private function requireAccountId(Request $request): string
+    {
+        $accountId = $request->user()->account_id;
+        abort_if($accountId === null, 403, 'Conta não associada ao usuário.');
+
+        return $accountId;
     }
 }

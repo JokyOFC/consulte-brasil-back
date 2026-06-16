@@ -14,9 +14,9 @@ final class PlanSeeder extends Seeder
     public function run(): void
     {
         $catalog = [
-            ['Starter', 'starter', 4900, 100, 'monthly'],
-            ['Growth', 'growth', 14900, 500, 'monthly'],
-            ['Scale', 'scale', 49900, 2000, 'monthly'],
+            ['Starter', 'starter', 4900, 10000, 'monthly'],
+            ['Growth', 'growth', 14900, 50000, 'monthly'],
+            ['Scale', 'scale', 49900, 200000, 'monthly'],
         ];
 
         $plans = app(PlanRepository::class);

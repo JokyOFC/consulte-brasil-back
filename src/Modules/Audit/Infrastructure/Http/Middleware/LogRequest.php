@@ -26,6 +26,7 @@ final class LogRequest
         'password', 'password_confirmation', 'current_password',
         'token', 'secret', 'api_key', 'apikey', 'access_token',
         'device_token', 'sandbox_token', 'bearer',
+        'document', 'cpf', 'cnpj', 'nr_cpf', 'nr_cnpj',
         // Dados de cartão (Mercado Pago) — nunca persistir em claro.
         'card_number', 'cardnumber', 'cvv', 'security_code', 'securitycode',
         'card_token', 'cardtoken', 'card_token_id',

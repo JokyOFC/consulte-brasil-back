@@ -17,12 +17,12 @@ export default function Welcome() {
             <Head title="Consulte Brasil — Consultas de dados via API">
                 <meta
                     name="description"
-                    content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com sistema de créditos."
+                    content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com saldo prepago."
                 />
                 <meta property="og:title" content="Consulte Brasil — Consultas de dados via API" />
                 <meta
                     property="og:description"
-                    content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com sistema de créditos."
+                    content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com saldo prepago."
                 />
                 <link rel="canonical" href="/" />
             </Head>
@@ -104,7 +104,7 @@ function Hero({ authed }: { authed: boolean }) {
                     </h1>
                     <p className="max-w-lg text-lg text-muted-foreground">
                         Integre nossa API ao seu sistema e consulte CPF, CNPJ e mais — pagando
-                        apenas pelo que usar, com um sistema de créditos transparente.
+                        apenas pelo que usar, com saldo prepago transparente.
                     </p>
                     <div className="flex flex-wrap gap-3">
                         <Link
@@ -186,7 +186,7 @@ function Features() {
 function HowItWorks() {
     const steps = [
         { n: '01', title: 'Crie sua conta', desc: 'Cadastre seus dados e documento (CPF ou CNPJ) em minutos.' },
-        { n: '02', title: 'Escolha um plano', desc: 'Receba créditos conforme o plano contratado.' },
+        { n: '02', title: 'Escolha um plano', desc: 'Receba saldo na carteira conforme o plano contratado.' },
         { n: '03', title: 'Integre via API', desc: 'Use sua chave Bearer e comece a consultar.' },
     ];
 
@@ -210,9 +210,9 @@ function HowItWorks() {
 
 function Pricing() {
     const plans = [
-        { name: 'Starter', price: 'R$ 49', credits: '100 créditos/mês', featured: false },
-        { name: 'Growth', price: 'R$ 149', credits: '500 créditos/mês', featured: true },
-        { name: 'Scale', price: 'R$ 499', credits: '2.000 créditos/mês', featured: false },
+        { name: 'Starter', price: 'R$ 49', credits: 'R$ 100 de saldo/mês', featured: false },
+        { name: 'Growth', price: 'R$ 149', credits: 'R$ 500 de saldo/mês', featured: true },
+        { name: 'Scale', price: 'R$ 499', credits: 'R$ 2.000 de saldo/mês', featured: false },
     ];
 
     return (

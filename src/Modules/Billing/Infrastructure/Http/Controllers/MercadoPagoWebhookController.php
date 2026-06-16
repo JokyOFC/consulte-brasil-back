@@ -18,6 +18,8 @@ use Src\Modules\Billing\Application\UseCase\HandleMercadoPagoWebhook;
 #[ExcludeAllRoutesFromDocs]
 final class MercadoPagoWebhookController
 {
+    private const SIGNATURE_MAX_AGE_SECONDS = 300;
+
     public function __invoke(Request $request, HandleMercadoPagoWebhook $handler): JsonResponse
     {
         $type = (string) ($request->input('type') ?? $request->query('type') ?? $request->query('topic') ?? '');
@@ -53,7 +55,7 @@ final class MercadoPagoWebhookController
     {
         $secret = (string) config('services.mercado_pago.webhook_secret', '');
         if ($secret === '') {
-            return true;
+            return ! app()->environment('production');
         }
 
         $signature = (string) $request->header('x-signature', '');
@@ -69,7 +71,11 @@ final class MercadoPagoWebhookController
 
         $ts = $parts['ts'] ?? null;
         $v1 = $parts['v1'] ?? null;
-        if ($ts === null || $v1 === null) {
+        if ($ts === null || $v1 === null || ! is_numeric($ts)) {
+            return false;
+        }
+
+        if (abs(time() - (int) $ts) > self::SIGNATURE_MAX_AGE_SECONDS) {
             return false;
         }
 

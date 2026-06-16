@@ -30,12 +30,14 @@ import {
 } from '@/components/chart-utils';
 import { ConsultationStatusBadge } from '@/components/consultation-status-badge';
 import { PageHeader } from '@/components/page-header';
+import { ProviderBalanceDisplay, type ProviderBalance } from '@/components/provider-balance-display';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
+import { queryTypeDisplayName } from '@/lib/query-type-display';
 
 interface Provider {
     id: string;
@@ -93,6 +95,7 @@ interface Props {
     daily: DailyPoint[];
     by_type: TypeRow[];
     recent: LogRow[];
+    balance: ProviderBalance;
 }
 
 const brlTick = (v: number) => formatBRL(v);
@@ -104,7 +107,7 @@ const chartAxisProps = {
     className: 'fill-muted-foreground',
 } as const;
 
-export default function AdminProviderShow({ provider, stats, daily, by_type, recent }: Props) {
+export default function AdminProviderShow({ provider, stats, daily, by_type, recent, balance }: Props) {
     usePageFlash();
 
     const dailyChart = useMemo(
@@ -195,6 +198,13 @@ export default function AdminProviderShow({ provider, stats, daily, by_type, rec
                         {provider.enabled_capabilities}/{provider.capabilities_count} tipos ativos
                     </Badge>
                 </div>
+
+                {provider.identifier !== 'mercado_pago' && (
+                    <ProviderBalanceDisplay
+                        balance={balance}
+                        providerId={provider.id}
+                    />
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard label="Receita (minha plataforma)" value={formatBRL(stats.revenue_cents)} icon={Wallet} highlight />
@@ -410,9 +420,9 @@ export default function AdminProviderShow({ provider, stats, daily, by_type, rec
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead className="text-left text-muted-foreground">
+                                    <thead className="bg-muted/30 text-left text-xs text-muted-foreground">
                                         <tr className="border-b border-border">
-                                            <th className="px-6 py-2.5 font-medium">Tipo</th>
+                                            <th className="px-6 py-2.5 font-medium">Consulta</th>
                                             <th className="px-6 py-2.5 text-right font-medium">Qtd</th>
                                             <th className="px-6 py-2.5 text-right font-medium">Receita</th>
                                             <th className="px-6 py-2.5 text-right font-medium">Custo</th>
@@ -420,10 +430,20 @@ export default function AdminProviderShow({ provider, stats, daily, by_type, rec
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {by_type.map((t) => (
-                                            <tr key={t.query_type} className="border-b border-border last:border-0">
+                                        {by_type.map((t, index) => (
+                                            <tr
+                                                key={t.query_type}
+                                                className={`border-b border-border last:border-0 hover:bg-muted/40 ${
+                                                    index % 2 === 1 ? 'bg-muted/15' : ''
+                                                }`}
+                                            >
                                                 <td className="px-6 py-2.5">
-                                                    <Badge variant="secondary">{formatQueryTypeLabel(t.query_type)}</Badge>
+                                                    <p className="font-medium">
+                                                        {queryTypeDisplayName(null, t.query_type)}
+                                                    </p>
+                                                    <code className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                                        {t.query_type}
+                                                    </code>
                                                 </td>
                                                 <td className="px-6 py-2.5 text-right tabular-nums">{t.total}</td>
                                                 <td className="px-6 py-2.5 text-right tabular-nums">{formatBRL(t.revenue)}</td>
@@ -451,21 +471,28 @@ export default function AdminProviderShow({ provider, stats, daily, by_type, rec
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead className="text-left text-muted-foreground">
+                                    <thead className="bg-muted/30 text-left text-xs text-muted-foreground">
                                         <tr className="border-b border-border">
                                             <th className="px-6 py-2.5 font-medium">Cliente</th>
-                                            <th className="px-6 py-2.5 font-medium">Tipo</th>
+                                            <th className="px-6 py-2.5 font-medium">Consulta</th>
                                             <th className="px-6 py-2.5 font-medium">Status</th>
                                             <th className="px-6 py-2.5 text-right font-medium">Latência</th>
                                             <th className="px-6 py-2.5 text-right font-medium">Valor</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {recent.map((c) => (
-                                            <tr key={c.id} className="border-b border-border last:border-0">
+                                        {recent.map((c, index) => (
+                                            <tr
+                                                key={c.id}
+                                                className={`border-b border-border last:border-0 hover:bg-muted/40 ${
+                                                    index % 2 === 1 ? 'bg-muted/15' : ''
+                                                }`}
+                                            >
                                                 <td className="px-6 py-2.5">{c.account_name ?? '—'}</td>
                                                 <td className="px-6 py-2.5">
-                                                    <Badge variant="secondary">{formatQueryTypeLabel(c.query_type)}</Badge>
+                                                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                                        {c.query_type}
+                                                    </code>
                                                 </td>
                                                 <td className="px-6 py-2.5"><ConsultationStatusBadge status={c.status} /></td>
                                                 <td className="px-6 py-2.5 text-right tabular-nums text-muted-foreground">

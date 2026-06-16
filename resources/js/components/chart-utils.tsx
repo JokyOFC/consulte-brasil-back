@@ -1,5 +1,7 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { formatBRL } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { useChartSize } from '@/hooks/use-chart-size';
 
 interface ChartTooltipEntry {
     name?: string;
@@ -100,6 +102,73 @@ export function chartYDomainMax(max: number): number {
     }
 
     return padded;
+}
+
+export function ChartResponsiveShell({
+    height,
+    className,
+    children,
+}: {
+    height: number;
+    className?: string;
+    children: (size: { width: number; height: number }) => ReactNode;
+}) {
+    const { ref, width, height: chartHeight } = useChartSize(height);
+
+    return (
+        <div ref={ref} className={cn('w-full min-w-0', className)} style={{ height }}>
+            {width > 0 ? children({ width, height: chartHeight }) : null}
+        </div>
+    );
+}
+
+export function ChartLegend({
+    items,
+    className,
+}: {
+    items: Array<{ label: string; color: string }>;
+    className?: string;
+}) {
+    return (
+        <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground', className)}>
+            {items.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-2">
+                    <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                    />
+                    {item.label}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+export function moneyChartLayout(isMobile: boolean) {
+    return {
+        height: isMobile ? 260 : 280,
+        margin: {
+            top: isMobile ? 8 : 8,
+            right: isMobile ? 8 : 20,
+            left: isMobile ? 0 : 4,
+            bottom: isMobile ? 8 : 4,
+        },
+        yAxisWidth: isMobile ? 52 : 76,
+        xAxisHeight: isMobile ? 56 : 30,
+        xAxisAngle: isMobile ? -35 : 0,
+        xAxisTextAnchor: (isMobile ? 'end' : 'middle') as 'end' | 'middle',
+        minTickGap: isMobile ? 10 : 24,
+        tickFontSize: isMobile ? 10 : 11,
+        legend: {
+            verticalAlign: (isMobile ? 'bottom' : 'top') as 'bottom' | 'top',
+            align: (isMobile ? 'left' : 'right') as 'left' | 'right',
+            wrapperStyle: {
+                fontSize: isMobile ? 11 : 12,
+                paddingBottom: isMobile ? 4 : 8,
+                paddingTop: isMobile ? 10 : 0,
+            },
+        },
+    };
 }
 
 export function chartMoneyDomain(min: number, max: number): [number, number] {

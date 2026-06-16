@@ -18,7 +18,7 @@ final class PaymentConfirmedMail extends BrandedMailable
     {
         return $this->paymentType === PaymentType::Invoice
             ? 'Pagamento de fatura confirmado'
-            : 'Recarga de créditos confirmada';
+            : 'Recarga de saldo confirmada';
     }
 
     protected function mailTitle(): string
@@ -28,7 +28,7 @@ final class PaymentConfirmedMail extends BrandedMailable
 
     protected function mailPreview(): string
     {
-        return 'Seus créditos já estão disponíveis na carteira.';
+        return 'Seu saldo já está disponível na carteira.';
     }
 
     protected function mailView(): string
@@ -39,8 +39,8 @@ final class PaymentConfirmedMail extends BrandedMailable
     protected function mailData(): array
     {
         $message = $this->paymentType === PaymentType::Invoice
-            ? 'Recebemos o pagamento da sua fatura. Os créditos do plano foram adicionados à sua carteira.'
-            : 'Sua recarga de créditos foi processada com sucesso. O saldo já está disponível para consultas.';
+            ? 'Recebemos o pagamento da sua fatura. O saldo do plano foi adicionado à sua carteira.'
+            : 'Sua recarga foi processada com sucesso. O saldo já está disponível para consultas.';
 
         return [
             'userName' => $this->user->name,

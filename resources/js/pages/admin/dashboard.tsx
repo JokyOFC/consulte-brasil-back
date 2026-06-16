@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Activity, ArrowRight, BarChart3, Building2, CreditCard, Layers, Repeat, Server, TrendingUp, Users } from 'lucide-react';
+import { Activity, ArrowRight, BarChart3, Building2, CreditCard, FileSearch, Layers, Repeat, Server, TrendingUp, Users } from 'lucide-react';
 import { useMemo } from 'react';
 import {
     Area,
@@ -286,9 +286,10 @@ export default function AdminDashboard({ stats, charts, recent }: Props) {
                     </Card>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <QuickLink href="/admin/accounts" title="Clientes" desc="Contas, saldos e ajustes." icon={Users} />
                     <QuickLink href="/admin/plans" title="Planos" desc="Catálogo e preços." icon={Layers} />
+                    <QuickLink href="/admin/query-types" title="Tipos de consulta" desc="Cache e catálogo." icon={FileSearch} />
                     <QuickLink href="/admin/providers" title="Provedores" desc="Ativação e prioridade." icon={Server} />
                 </div>
 

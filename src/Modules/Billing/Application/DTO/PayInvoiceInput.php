@@ -9,6 +9,7 @@ use Src\Modules\Billing\Domain\ValueObject\PaymentMethod;
 final readonly class PayInvoiceInput
 {
     public function __construct(
+        public string $accountId,
         public string $invoiceId,
         public PaymentMethod $method,
         public string $payerEmail,

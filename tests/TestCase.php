@@ -13,4 +13,9 @@ abstract class TestCase extends BaseTestCase
             $this->markTestSkipped($message ?? "Fortify feature [{$feature}] is not enabled.");
         }
     }
+
+    protected function withConfirmedPassword(): static
+    {
+        return $this->withSession(['auth.password_confirmed_at' => time()]);
+    }
 }

@@ -16,5 +16,8 @@ final readonly class SubscribeToPlanInput
         public string $backUrl,
         // Token de cartão (Bricks) → habilita cobrança recorrente automática.
         public ?string $cardToken = null,
+        public int $installments = 1,
+        public ?string $paymentMethodId = null,
+        public ?string $issuerId = null,
     ) {}
 }

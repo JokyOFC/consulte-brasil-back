@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePageFlash } from '@/hooks/use-page-flash';
+import { formatBRL } from '@/lib/format';
 
 interface KeyRow {
     id: string;
@@ -59,9 +60,9 @@ export default function ClientApiKeysIndex() {
 
                 {wallet && (
                     <div className="grid gap-4 sm:grid-cols-3">
-                        <StatCard label="Créditos disponíveis" value={wallet.available} icon={Coins} highlight />
-                        <StatCard label="Saldo total" value={wallet.balance} icon={Wallet} />
-                        <StatCard label="Reservado" value={wallet.reserved} icon={Lock} />
+                        <StatCard label="Saldo disponível" value={formatBRL(wallet.available)} icon={Coins} highlight />
+                        <StatCard label="Saldo total" value={formatBRL(wallet.balance)} icon={Wallet} />
+                        <StatCard label="Reservado" value={formatBRL(wallet.reserved)} icon={Lock} />
                     </div>
                 )}
 

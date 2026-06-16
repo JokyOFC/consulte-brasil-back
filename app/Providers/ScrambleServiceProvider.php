@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecuritySchemes\HttpSecurityScheme;
@@ -13,7 +14,7 @@ class ScrambleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        Gate::define('viewApiDocs', fn () => true);
+        Gate::define('viewApiDocs', fn (?User $user = null) => $user !== null && $user->role === 'admin');
 
         Scramble::afterOpenApiGenerated(function (OpenApi $openApi): void {
             $openApi->info->setDescription($this->introduction());
@@ -29,7 +30,9 @@ class ScrambleServiceProvider extends ServiceProvider
 
             $openApi->tags = [
                 new Tag('Sistema', 'Endpoints de saúde e metadados da API.'),
+                new Tag('Planos', 'Catálogo público de planos de assinatura.'),
                 new Tag('Conta', 'Informações da conta autenticada pela chave de API.'),
+                new Tag('Carteira', 'Saldo em reais (R$) da conta autenticada.'),
                 new Tag('Consultas', 'Execução de consultas de dados (CPF, CNPJ, etc.).'),
             ];
         });
@@ -40,7 +43,7 @@ class ScrambleServiceProvider extends ServiceProvider
         return <<<'MD'
 ## Visão geral
 
-A API do **Consulte Brasil** permite integrar consultas de dados oficiais do Brasil ao seu sistema. Cada consulta consome créditos da sua conta conforme o tipo e o provedor utilizado.
+A API do **Consulte Brasil** permite integrar consultas de dados oficiais do Brasil ao seu sistema. Cada consulta consome saldo da sua carteira conforme o tipo e o provedor utilizado.
 
 ## Autenticação
 
@@ -96,7 +99,7 @@ curl -X POST https://seu-dominio.com/api/v1/consult/cpf \
 | HTTP | Significado |
 |------|-------------|
 | `401` | Chave ausente, inválida ou revogada |
-| `402` | Créditos insuficientes na conta |
+| `402` | Saldo insuficiente na carteira |
 | `422` | Parâmetros inválidos ou tipo de consulta inexistente |
 | `429` | Limite de requisições excedido (60/min por chave) |
 | `503` | Provedores indisponíveis no momento |
@@ -104,7 +107,8 @@ curl -X POST https://seu-dominio.com/api/v1/consult/cpf \
 ## Limites
 
 - **Rate limit:** 60 requisições por minuto por chave autenticada.
-- **Créditos:** debitados apenas em consultas concluídas com sucesso.
+- **Saldo:** debitado apenas em consultas concluídas com sucesso.
+- **Cache:** consultas idênticas podem retornar resposta recente com `from_cache: true`. O TTL é configurável por tipo (`query_types.cache_ttl_seconds`); expira automaticamente e é invalidado ao alterar provedor ou TTL do tipo.
 MD;
     }
 }

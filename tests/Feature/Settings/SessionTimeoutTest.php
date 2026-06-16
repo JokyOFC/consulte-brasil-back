@@ -18,6 +18,7 @@ final class SessionTimeoutTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)
+            ->withConfirmedPassword()
             ->put('/admin/settings', ['session_timeout_minutes' => 45])
             ->assertRedirect();
 
@@ -33,6 +34,7 @@ final class SessionTimeoutTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)
+            ->withConfirmedPassword()
             ->from('/admin/settings')
             ->put('/admin/settings', ['session_timeout_minutes' => 0])
             ->assertRedirect('/admin/settings')

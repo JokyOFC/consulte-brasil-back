@@ -7,6 +7,7 @@ namespace Src\Modules\Billing\Application\UseCase;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
 use Src\Modules\Billing\Domain\Exception\PaymentGatewayError;
 use Src\Modules\Billing\Domain\Exception\PlanNotFound;
+use Src\Modules\Billing\Domain\Exception\SubscriptionNotFound;
 use Src\Modules\Billing\Domain\Repository\PlanRepository;
 use Src\Modules\Billing\Domain\Repository\SubscriptionRepository;
 
@@ -23,11 +24,11 @@ final readonly class ChangeSubscription
         private PaymentGateway $gateway,
     ) {}
 
-    public function handle(string $subscriptionId, string $newPlanId): void
+    public function handle(string $subscriptionId, string $accountId, string $newPlanId): void
     {
         $subscription = $this->subscriptions->findById($subscriptionId);
-        if ($subscription === null) {
-            return;
+        if ($subscription === null || $subscription->accountId !== $accountId) {
+            throw SubscriptionNotFound::withId($subscriptionId);
         }
 
         if ($this->plans->findById($newPlanId) === null) {

@@ -1,8 +1,19 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronDown, FlaskConical, LineChart, Pencil, Plus, Power, Server } from 'lucide-react';
+import {
+    ChevronDown,
+    FlaskConical,
+    KeyRound,
+    LineChart,
+    Pencil,
+    Plus,
+    Power,
+    Search,
+    Server,
+} from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
+import { ProviderBalanceDisplay, type ProviderBalance } from '@/components/provider-balance-display';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -20,11 +31,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
+import {
+    groupByQueryTypeCategory,
+    queryTypeDisplayName,
+    queryTypeShortName,
+} from '@/lib/query-type-display';
 
 const MARKUP = 1.1;
 
 interface Capability {
     query_type: string;
+    query_type_name: string | null;
     priority: number;
     price_cents: number;
     cost_cents: number | null;
@@ -44,6 +61,7 @@ interface ProviderRow {
     has_token: boolean;
     has_sandbox_token: boolean;
     capabilities: Capability[];
+    balance: ProviderBalance;
 }
 
 interface PageProps {
@@ -51,9 +69,357 @@ interface PageProps {
     [key: string]: unknown;
 }
 
+function capabilityMatches(capability: Capability, term: string): boolean {
+    const displayName = queryTypeDisplayName(capability.query_type_name, capability.query_type).toLowerCase();
+
+    return (
+        capability.query_type.toLowerCase().includes(term)
+        || displayName.includes(term)
+        || (capability.endpoint?.toLowerCase().includes(term) ?? false)
+    );
+}
+
+function providerMatches(provider: ProviderRow, term: string): boolean {
+    return (
+        provider.name.toLowerCase().includes(term)
+        || provider.identifier.toLowerCase().includes(term)
+        || (provider.base_url?.toLowerCase().includes(term) ?? false)
+        || provider.capabilities.some((capability) => capabilityMatches(capability, term))
+    );
+}
+
+function ProviderStatusBadge({ status }: { status: string }) {
+    return (
+        <Badge
+            variant="outline"
+            className={status === 'enabled'
+                ? 'border-transparent bg-green-100 text-green-700'
+                : 'border-transparent bg-muted text-muted-foreground'}
+        >
+            {status === 'enabled' ? 'Habilitado' : 'Desabilitado'}
+        </Badge>
+    );
+}
+
+function ProviderEnvironmentBadge({ environment }: { environment: string }) {
+    return (
+        <Badge
+            variant="outline"
+            className={environment === 'production'
+                ? 'border-transparent bg-blue-100 text-blue-700'
+                : 'border-transparent bg-amber-100 text-amber-700'}
+        >
+            {environment === 'production' ? 'Produção' : 'Sandbox'}
+        </Badge>
+    );
+}
+
+function ProviderActions({ provider }: { provider: ProviderRow }) {
+    return (
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Button variant="outline" size="sm" asChild title="Ver dashboard detalhado">
+                <Link href={`/admin/providers/${provider.id}`}>
+                    <LineChart className="size-4" />
+                    Detalhes
+                </Link>
+            </Button>
+            <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                title={provider.environment === 'production'
+                    ? 'Alternar para sandbox'
+                    : 'Alternar para produção'}
+                onClick={() => router.post(
+                    `/admin/providers/${provider.id}/environment`,
+                    { environment: provider.environment === 'production' ? 'sandbox' : 'production' },
+                    { preserveScroll: true },
+                )}
+            >
+                <FlaskConical className="size-4" />
+            </Button>
+            <EditProviderDialog
+                provider={provider}
+                trigger={(
+                    <Button variant="outline" size="icon" className="size-8" title="Editar provedor">
+                        <Pencil className="size-4" />
+                    </Button>
+                )}
+            />
+            <CapabilityDialog
+                providerId={provider.id}
+                trigger={(
+                    <Button variant="outline" size="icon" className="size-8" title="Adicionar capacidade">
+                        <Plus className="size-4" />
+                    </Button>
+                )}
+            />
+            <Button
+                variant={provider.status === 'enabled' ? 'outline' : 'default'}
+                size="icon"
+                className="size-8"
+                title={provider.status === 'enabled' ? 'Desabilitar provedor' : 'Habilitar provedor'}
+                onClick={() => router.post(`/admin/providers/${provider.id}/toggle`, {}, { preserveScroll: true })}
+            >
+                <Power className="size-4" />
+            </Button>
+        </div>
+    );
+}
+
+function CapabilityTable({
+    capabilities,
+    providerId,
+}: {
+    capabilities: Capability[];
+    providerId: string;
+}) {
+    const groups = useMemo(
+        () => groupByQueryTypeCategory(
+            capabilities,
+            (capability) => queryTypeDisplayName(capability.query_type_name, capability.query_type),
+            (capability) => capability.query_type,
+        ),
+        [capabilities],
+    );
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+                <thead className="bg-muted/30 text-left text-xs text-muted-foreground">
+                    <tr className="border-b border-border">
+                        <th className="px-4 py-2 font-medium md:px-6">Consulta</th>
+                        <th className="px-4 py-2 font-medium md:px-6">Código</th>
+                        <th className="px-4 py-2 text-right font-medium md:px-6">Prioridade</th>
+                        <th className="px-4 py-2 text-right font-medium md:px-6">Custo</th>
+                        <th className="px-4 py-2 text-right font-medium md:px-6">Venda</th>
+                        <th className="px-4 py-2 font-medium md:px-6">Endpoint</th>
+                        <th className="px-4 py-2 font-medium md:px-6">Situação</th>
+                        <th className="px-4 py-2 md:px-6"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {groups.flatMap((group) => [
+                        <tr key={`${group.category}-header`} className="bg-muted/30">
+                            <td
+                                colSpan={8}
+                                className="px-4 py-2 text-xs font-medium tracking-wide text-muted-foreground uppercase md:px-6"
+                            >
+                                {group.category}
+                                <span className="ml-2 font-normal normal-case tabular-nums">
+                                    · {group.items.length} {group.items.length === 1 ? 'tipo' : 'tipos'}
+                                </span>
+                            </td>
+                        </tr>,
+                        ...group.items.map((capability, index) => {
+                            const displayName = queryTypeDisplayName(
+                                capability.query_type_name,
+                                capability.query_type,
+                            );
+
+                            return (
+                                <tr
+                                    key={capability.query_type}
+                                    className={`border-b border-border last:border-0 hover:bg-muted/40 ${
+                                        index % 2 === 1 ? 'bg-muted/15' : ''
+                                    }`}
+                                >
+                                    <td className="max-w-[14rem] px-4 py-2.5 md:max-w-xs md:px-6">
+                                        <p className="truncate font-medium">
+                                            {queryTypeShortName(displayName, group.category)}
+                                        </p>
+                                    </td>
+                                    <td className="px-4 py-2.5 md:px-6">
+                                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                            {capability.query_type}
+                                        </code>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground md:px-6">
+                                        {capability.priority}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground md:px-6">
+                                        {capability.cost_cents !== null ? formatBRL(capability.cost_cents) : '—'}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-medium tabular-nums md:px-6">
+                                        {formatBRL(capability.price_cents)}
+                                    </td>
+                                    <td className="max-w-[10rem] px-4 py-2.5 md:px-6">
+                                        {capability.endpoint ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                                                    {capability.endpoint}
+                                                </code>
+                                                {capability.has_device_token && (
+                                                    <Badge variant="outline" className="shrink-0 px-1.5 text-[10px]">
+                                                        device
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">padrão</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2.5 md:px-6">
+                                        <Badge
+                                            variant="outline"
+                                            className={capability.enabled
+                                                ? 'border-transparent bg-green-100 text-green-700'
+                                                : 'border-transparent bg-muted text-muted-foreground'}
+                                        >
+                                            {capability.enabled ? 'Ativa' : 'Inativa'}
+                                        </Badge>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right md:px-6">
+                                        <CapabilityDialog
+                                            providerId={providerId}
+                                            capability={capability}
+                                            trigger={(
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-8"
+                                                    title="Editar capacidade"
+                                                >
+                                                    <Pencil className="size-4" />
+                                                </Button>
+                                            )}
+                                        />
+                                    </td>
+                                </tr>
+                            );
+                        }),
+                    ])}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function ProviderCard({
+    provider,
+    defaultOpen,
+}: {
+    provider: ProviderRow;
+    defaultOpen: boolean;
+}) {
+    const [open, setOpen] = useState(defaultOpen);
+    const enabledCount = provider.capabilities.filter((capability) => capability.enabled).length;
+
+    return (
+        <Card className="gap-0 py-0">
+            <Collapsible open={open} onOpenChange={setOpen}>
+                <CardHeader className="border-b border-border py-3">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                            <CollapsibleTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="mt-0.5 size-8 shrink-0"
+                                    title={open ? 'Recolher capacidades' : 'Expandir capacidades'}
+                                >
+                                    <ChevronDown
+                                        className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`}
+                                    />
+                                </Button>
+                            </CollapsibleTrigger>
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                                <Server className="size-5" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="font-semibold">{provider.name}</h3>
+                                    <ProviderStatusBadge status={provider.status} />
+                                    <ProviderEnvironmentBadge environment={provider.environment} />
+                                    <Badge variant="secondary" className="tabular-nums">
+                                        {provider.capabilities.length} tipos
+                                        {enabledCount !== provider.capabilities.length ? ` · ${enabledCount} ativos` : ''}
+                                    </Badge>
+                                </div>
+                                <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                                    {provider.identifier}
+                                    {provider.base_url ? ` · ${provider.base_url}` : ''}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                                        <KeyRound className="size-3" />
+                                        Prod {provider.has_token ? 'ok' : '—'}
+                                    </Badge>
+                                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                                        <KeyRound className="size-3" />
+                                        Sandbox {provider.has_sandbox_token ? 'ok' : '—'}
+                                    </Badge>
+                                    <ProviderBalanceDisplay
+                                        balance={provider.balance}
+                                        providerId={provider.identifier === 'mercado_pago' ? undefined : provider.id}
+                                        compact
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <ProviderActions provider={provider} />
+                    </div>
+                </CardHeader>
+                <CollapsibleContent>
+                    <CardContent className="p-0">
+                        {provider.capabilities.length === 0 ? (
+                            <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    Sem capacidades. Adicione um tipo de consulta para este provedor.
+                                </p>
+                                <CapabilityDialog providerId={provider.id} />
+                            </div>
+                        ) : (
+                            <CapabilityTable
+                                capabilities={provider.capabilities}
+                                providerId={provider.id}
+                            />
+                        )}
+                    </CardContent>
+                </CollapsibleContent>
+            </Collapsible>
+        </Card>
+    );
+}
+
 export default function AdminProvidersIndex() {
     usePageFlash();
     const { providers } = usePage<PageProps>().props;
+    const [search, setSearch] = useState('');
+
+    const filteredProviders = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) {
+            return providers;
+        }
+
+        return providers
+            .filter((provider) => providerMatches(provider, term))
+            .map((provider) => {
+                const providerHit = (
+                    provider.name.toLowerCase().includes(term)
+                    || provider.identifier.toLowerCase().includes(term)
+                    || (provider.base_url?.toLowerCase().includes(term) ?? false)
+                );
+
+                return {
+                    ...provider,
+                    capabilities: providerHit
+                        ? provider.capabilities
+                        : provider.capabilities.filter((capability) => capabilityMatches(capability, term)),
+                };
+            });
+    }, [providers, search]);
+
+    const totals = useMemo(() => {
+        const capabilities = filteredProviders.flatMap((provider) => provider.capabilities);
+
+        return {
+            providers: filteredProviders.length,
+            capabilities: capabilities.length,
+            active: capabilities.filter((capability) => capability.enabled).length,
+        };
+    }, [filteredProviders]);
 
     return (
         <>
@@ -65,180 +431,49 @@ export default function AdminProvidersIndex() {
                     actions={<CreateProviderDialog />}
                 />
 
-                {providers.length === 0 ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative w-full sm:max-w-sm">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Buscar provedor ou tipo de consulta..."
+                            className="pl-9"
+                        />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        {totals.providers} de {providers.length} provedores
+                        {' · '}
+                        {totals.capabilities} capacidades
+                        {' · '}
+                        {totals.active} ativas
+                    </p>
+                </div>
+
+                {filteredProviders.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
                             <Server className="size-8 text-muted-foreground/50" />
-                            <p className="text-sm text-muted-foreground">Nenhum provedor cadastrado ainda.</p>
+                            <p className="text-sm text-muted-foreground">
+                                {providers.length === 0
+                                    ? 'Nenhum provedor cadastrado ainda.'
+                                    : `Nenhum resultado para "${search.trim()}".`}
+                            </p>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="space-y-4">
-                        {providers.map((p) => (
-                            <ProviderCard key={p.id} provider={p} />
+                    <div className="space-y-3">
+                        {filteredProviders.map((provider, index) => (
+                            <ProviderCard
+                                key={provider.id}
+                                provider={provider}
+                                defaultOpen={search.trim().length > 0 || index === 0}
+                            />
                         ))}
                     </div>
                 )}
             </div>
         </>
-    );
-}
-
-function ProviderCard({ provider: p }: { provider: ProviderRow }) {
-    const [open, setOpen] = useState(false);
-    const enabledCount = p.capabilities.filter((c) => c.enabled).length;
-
-    return (
-        <Card className="gap-0 py-0">
-            <Collapsible open={open} onOpenChange={setOpen}>
-                <CardHeader className="flex flex-row items-center justify-between border-b border-border py-4">
-                    <div className="flex items-center gap-3">
-                        <CollapsibleTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8 shrink-0"
-                                title={open ? 'Recolher' : 'Expandir'}
-                            >
-                                <ChevronDown
-                                    className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`}
-                                />
-                            </Button>
-                        </CollapsibleTrigger>
-                        <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                            <Server className="size-5" />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h3 className="font-medium">{p.name}</h3>
-                                <Badge
-                                    variant="outline"
-                                    className={p.status === 'enabled'
-                                        ? 'border-transparent bg-green-100 text-green-700'
-                                        : 'border-transparent bg-muted text-muted-foreground'}
-                                >
-                                    {p.status === 'enabled' ? 'Habilitado' : 'Desabilitado'}
-                                </Badge>
-                                <Badge
-                                    variant="outline"
-                                    className={p.environment === 'production'
-                                        ? 'border-transparent bg-blue-100 text-blue-700'
-                                        : 'border-transparent bg-amber-100 text-amber-700'}
-                                >
-                                    {p.environment === 'production' ? 'Produção' : 'Sandbox'}
-                                </Badge>
-                                <Badge variant="secondary" className="tabular-nums">
-                                    {p.capabilities.length} {p.capabilities.length === 1 ? 'tipo' : 'tipos'}
-                                    {enabledCount !== p.capabilities.length ? ` · ${enabledCount} ativos` : ''}
-                                </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                {p.identifier}{p.base_url ? ` · ${p.base_url}` : ''}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button variant="outline" size="sm" asChild title="Ver dashboard detalhado">
-                            <Link href={`/admin/providers/${p.id}`}>
-                                <LineChart /> Detalhes
-                            </Link>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            title={p.environment === 'production'
-                                ? 'Alternar para sandbox (dados de teste)'
-                                : 'Alternar para produção (consome créditos)'}
-                            onClick={() => router.post(
-                                `/admin/providers/${p.id}/environment`,
-                                { environment: p.environment === 'production' ? 'sandbox' : 'production' },
-                                { preserveScroll: true },
-                            )}
-                        >
-                            <FlaskConical /> {p.environment === 'production' ? 'Usar sandbox' : 'Usar produção'}
-                        </Button>
-                        <EditProviderDialog provider={p} />
-                        <CapabilityDialog providerId={p.id} />
-                        <Button
-                            variant={p.status === 'enabled' ? 'outline' : 'default'}
-                            size="sm"
-                            onClick={() => router.post(`/admin/providers/${p.id}/toggle`, {}, { preserveScroll: true })}
-                        >
-                            <Power /> {p.status === 'enabled' ? 'Desabilitar' : 'Habilitar'}
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CollapsibleContent>
-                    <CardContent className="p-0">
-                        {p.capabilities.length === 0 ? (
-                            <p className="px-6 py-6 text-center text-sm text-muted-foreground">
-                                Sem capacidades. Adicione um tipo de consulta para este provedor.
-                            </p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="text-left text-muted-foreground">
-                                        <tr className="border-b border-border">
-                                            <th className="px-6 py-2.5 font-medium">Tipo</th>
-                                            <th className="px-6 py-2.5 font-medium">Endpoint</th>
-                                            <th className="px-6 py-2.5 text-right font-medium">Prioridade</th>
-                                            <th className="px-6 py-2.5 text-right font-medium">Custo</th>
-                                            <th className="px-6 py-2.5 text-right font-medium">Venda</th>
-                                            <th className="px-6 py-2.5 font-medium">Situação</th>
-                                            <th className="px-6 py-2.5 text-right font-medium">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {p.capabilities.map((c) => (
-                                            <tr key={c.query_type} className="border-b border-border last:border-0">
-                                                <td className="px-6 py-2.5">
-                                                    <Badge variant="secondary" className="uppercase">{c.query_type}</Badge>
-                                                </td>
-                                                <td className="px-6 py-2.5">
-                                                    {c.endpoint ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{c.endpoint}</code>
-                                                            {c.has_device_token && (
-                                                                <Badge variant="outline" className="border-transparent bg-green-100 text-green-700">
-                                                                    token
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">padrão (.env)</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-2.5 text-right tabular-nums text-muted-foreground">
-                                                    {c.cost_cents !== null ? formatBRL(c.cost_cents) : '—'}
-                                                </td>
-                                                <td className="px-6 py-2.5 text-right font-medium tabular-nums">{formatBRL(c.price_cents)}</td>
-                                                <td className="px-6 py-2.5">
-                                                    {c.enabled
-                                                        ? <span className="text-green-700">Ativa</span>
-                                                        : <span className="text-muted-foreground">Inativa</span>}
-                                                </td>
-                                                <td className="px-6 py-2.5 text-right">
-                                                    <CapabilityDialog
-                                                        providerId={p.id}
-                                                        capability={c}
-                                                        trigger={
-                                                            <Button variant="ghost" size="sm">
-                                                                <Pencil className="size-4" />
-                                                                Editar
-                                                            </Button>
-                                                        }
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </CardContent>
-                </CollapsibleContent>
-            </Collapsible>
-        </Card>
     );
 }
 
@@ -362,7 +597,13 @@ function CreateProviderDialog() {
     );
 }
 
-function EditProviderDialog({ provider }: { provider: ProviderRow }) {
+function EditProviderDialog({
+    provider,
+    trigger,
+}: {
+    provider: ProviderRow;
+    trigger?: ReactNode;
+}) {
     const [open, setOpen] = useState(false);
     const form = useForm(providerFormDefaults(provider));
 
@@ -389,10 +630,12 @@ function EditProviderDialog({ provider }: { provider: ProviderRow }) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                    <Pencil className="size-4" />
-                    Editar
-                </Button>
+                {trigger ?? (
+                    <Button variant="outline" size="sm">
+                        <Pencil className="size-4" />
+                        Editar
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -528,7 +771,6 @@ function CapabilityDialog({
         });
     };
 
-    // Ao informar o custo do provedor, sugere o preço de venda (custo + 10%).
     const onCostChange = (value: string) => {
         form.setData('cost_reais', value);
 
@@ -536,6 +778,10 @@ function CapabilityDialog({
             form.setData('price_reais', (Number(value) * MARKUP).toFixed(2));
         }
     };
+
+    const displayName = capability
+        ? queryTypeDisplayName(capability.query_type_name, capability.query_type)
+        : null;
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -553,7 +799,7 @@ function CapabilityDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? 'Altere prioridade, custo ou situação desta capacidade.'
+                            ? `Altere prioridade, custo ou situação de ${displayName ?? capability?.query_type}.`
                             : 'Define como este provedor atende um tipo de consulta.'}
                     </DialogDescription>
                 </DialogHeader>
@@ -566,8 +812,11 @@ function CapabilityDialog({
                             placeholder="cpf"
                             required
                             readOnly={isEdit}
-                            className={isEdit ? 'bg-muted' : undefined}
+                            className={isEdit ? 'bg-muted font-mono' : 'font-mono'}
                         />
+                        {isEdit && displayName && (
+                            <p className="text-xs text-muted-foreground">{displayName}</p>
+                        )}
                         {isEdit && (
                             <p className="text-xs text-muted-foreground">
                                 O tipo de consulta não pode ser alterado após o cadastro.

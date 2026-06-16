@@ -14,7 +14,7 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'phone', 'password', 'account_id', 'role', 'last_login_at', 'last_login_ip', 'last_login_user_agent'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'last_login_at', 'last_login_ip', 'last_login_user_agent'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {

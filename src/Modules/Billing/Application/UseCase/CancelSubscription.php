@@ -6,6 +6,7 @@ namespace Src\Modules\Billing\Application\UseCase;
 
 use Src\Modules\Billing\Application\Port\PaymentGateway;
 use Src\Modules\Billing\Domain\Exception\PaymentGatewayError;
+use Src\Modules\Billing\Domain\Exception\SubscriptionNotFound;
 use Src\Modules\Billing\Domain\Repository\SubscriptionRepository;
 use Src\Shared\Application\Contracts\Clock;
 
@@ -21,11 +22,11 @@ final readonly class CancelSubscription
         private Clock $clock,
     ) {}
 
-    public function handle(string $subscriptionId): void
+    public function handle(string $subscriptionId, string $accountId): void
     {
         $subscription = $this->subscriptions->findById($subscriptionId);
-        if ($subscription === null) {
-            return;
+        if ($subscription === null || $subscription->accountId !== $accountId) {
+            throw SubscriptionNotFound::withId($subscriptionId);
         }
 
         if ($subscription->mpPreapprovalId !== null) {

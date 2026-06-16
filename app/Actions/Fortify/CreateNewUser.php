@@ -46,14 +46,19 @@ class CreateNewUser implements CreatesNewUsers
                 document: $input['document'],
             ));
 
-            return User::create([
+            $user = User::create([
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'phone' => $input['phone'],
                 'password' => $input['password'],
+            ]);
+
+            $user->forceFill([
                 'account_id' => $account->id->value,
                 'role' => Role::Client->value,
-            ]);
+            ])->save();
+
+            return $user;
         });
     }
 }

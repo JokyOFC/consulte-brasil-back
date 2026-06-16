@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AdminConsumptionOverview;
 use App\Support\AppSettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -54,6 +55,9 @@ class HandleInertiaRequests extends Middleware
                 'plain_token' => fn () => $request->session()->get('plain_token'),
                 'payment' => fn () => $request->session()->get('payment'),
             ],
+            'adminShell' => fn () => $request->user()?->role === 'admin'
+                ? app(AdminConsumptionOverview::class)->headerPayload()
+                : null,
         ];
     }
 }

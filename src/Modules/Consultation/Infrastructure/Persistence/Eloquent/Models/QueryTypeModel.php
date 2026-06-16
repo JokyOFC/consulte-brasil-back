@@ -18,5 +18,6 @@ final class QueryTypeModel extends Model
 
     protected $casts = [
         'default_credit_cost' => 'integer',
+        'cache_ttl_seconds' => 'integer',
     ];
 }

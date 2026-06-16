@@ -13,7 +13,7 @@
                     <strong>Valor pago:</strong> {{ $amountFormatted }}
                 </p>
                 <p style="margin:0;font-size:15px;color:#111827;">
-                    <strong>Créditos adicionados:</strong> {{ $creditsFormatted }}
+                    <strong>Saldo adicionado:</strong> {{ $creditsFormatted }}
                 </p>
             </td>
         </tr>

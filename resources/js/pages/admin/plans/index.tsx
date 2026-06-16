@@ -62,7 +62,7 @@ export default function AdminPlansIndex() {
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Planos"
-                    description="Catálogo de planos vendáveis e seus créditos inclusos."
+                    description="Catálogo de planos vendáveis e o saldo incluso em cada um."
                     actions={<CreatePlanDialog />}
                 />
 
@@ -159,7 +159,7 @@ function PlanCatalogCard({
                     <li className="flex items-center gap-2">
                         <Check className="size-4 shrink-0 text-brand-green" />
                         <span>
-                            <strong>{plan.included_credits.toLocaleString('pt-BR')}</strong> créditos inclusos
+                            <strong>{formatBRL(plan.included_credits)}</strong> de saldo incluso
                         </span>
                     </li>
                     <li className="flex items-center gap-2 text-muted-foreground">
@@ -169,7 +169,7 @@ function PlanCatalogCard({
                     {plan.overage_price_cents !== null && (
                         <li className="flex items-center gap-2 text-muted-foreground">
                             <Coins className="size-4 shrink-0 text-brand-green" />
-                            Excedente: {formatBRL(plan.overage_price_cents)}/crédito
+                            Excedente: {formatBRL(plan.overage_price_cents)}/consulta
                         </li>
                     )}
                 </ul>
@@ -193,7 +193,7 @@ function CreatePlanDialog() {
         name: '',
         slug: '',
         price_cents: '',
-        included_credits: '',
+        included_reais: '',
         billing_period: 'monthly',
         overage_price_cents: '',
     });
@@ -203,7 +203,7 @@ function CreatePlanDialog() {
         form.transform((d) => ({
             ...d,
             price_cents: Number(d.price_cents),
-            included_credits: Number(d.included_credits),
+            included_credits: Math.round(Number(d.included_reais) * 100),
             overage_price_cents: d.overage_price_cents === '' ? null : Number(d.overage_price_cents),
         }));
         form.post('/admin/plans', {
@@ -223,7 +223,7 @@ function CreatePlanDialog() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Novo plano</DialogTitle>
-                    <DialogDescription>Defina preço, créditos inclusos e período.</DialogDescription>
+                    <DialogDescription>Defina preço, saldo incluso e período.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label="Nome" error={form.errors.name}>
@@ -235,8 +235,8 @@ function CreatePlanDialog() {
                     <Field label="Preço (centavos)" error={form.errors.price_cents}>
                         <Input type="number" value={form.data.price_cents} onChange={(e) => form.setData('price_cents', e.target.value)} placeholder="14900" required />
                     </Field>
-                    <Field label="Créditos inclusos" error={form.errors.included_credits}>
-                        <Input type="number" value={form.data.included_credits} onChange={(e) => form.setData('included_credits', e.target.value)} placeholder="500" required />
+                    <Field label="Saldo incluso (R$)" error={form.errors.included_reais ?? (form.errors as Record<string, string>).included_credits}>
+                        <Input type="number" min={0} step="0.01" value={form.data.included_reais} onChange={(e) => form.setData('included_reais', e.target.value)} placeholder="100.00" required />
                     </Field>
                     <Field label="Período">
                         <Select value={form.data.billing_period} onValueChange={(v) => form.setData('billing_period', v)}>

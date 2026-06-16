@@ -26,12 +26,17 @@ final class QueryTypeSeeder extends Seeder
             if (DB::table('query_types')->where('code', $code)->exists()) {
                 continue;
             }
+
+            $cacheTtl = config("consultation.cache_ttl_by_query_type.{$code}")
+                ?? config('consultation.default_cache_ttl_seconds', 86400);
+
             DB::table('query_types')->insert([
                 'id' => $ids->generate(),
                 'code' => $code,
                 'name' => $name,
                 'description' => $description,
                 'default_credit_cost' => Pricing::sellPriceCents($cost),
+                'cache_ttl_seconds' => $cacheTtl,
                 'status' => 'active',
                 'created_at' => now(),
                 'updated_at' => now(),

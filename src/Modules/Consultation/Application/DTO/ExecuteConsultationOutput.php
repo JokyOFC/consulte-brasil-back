@@ -12,5 +12,6 @@ final readonly class ExecuteConsultationOutput
         public string $providerIdentifier,
         public array $data,
         public int $creditsCharged,
+        public bool $fromCache = false,
     ) {}
 }

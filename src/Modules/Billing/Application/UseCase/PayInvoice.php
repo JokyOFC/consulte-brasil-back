@@ -38,7 +38,7 @@ final readonly class PayInvoice
     {
         $invoice = $this->invoices->findById($input->invoiceId);
 
-        if ($invoice === null || ! $invoice->isPayable()) {
+        if ($invoice === null || ! $invoice->isPayable() || $invoice->accountId !== $input->accountId) {
             throw InvoiceNotFound::withId($input->invoiceId);
         }
 

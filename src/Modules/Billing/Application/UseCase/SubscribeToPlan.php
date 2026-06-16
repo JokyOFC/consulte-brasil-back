@@ -54,7 +54,11 @@ final readonly class SubscribeToPlan
         $subscriptionId = $this->ids->generate();
         $amountCents = $plan->price->cents;
 
-        if ($input->method === PaymentMethod::CreditCard && $input->cardToken !== null) {
+        if (
+            $input->method === PaymentMethod::CreditCard
+            && $input->cardToken !== null
+            && $this->gateway->supportsAutomaticCardRecurring()
+        ) {
             $preapproval = $this->gateway->createPreapproval(new GatewayPreapprovalInput(
                 amountCents: $amountCents,
                 reason: "Assinatura {$plan->name}",
@@ -113,9 +117,14 @@ final readonly class SubscribeToPlan
         $this->invoices->save($invoice);
 
         $payment = $this->payInvoice->handle(new PayInvoiceInput(
+            accountId: $input->accountId,
             invoiceId: $invoice->id,
             method: $input->method,
             payerEmail: $input->payerEmail,
+            cardToken: $input->cardToken,
+            installments: $input->installments,
+            paymentMethodId: $input->paymentMethodId,
+            issuerId: $input->issuerId,
         ));
 
         return ['subscription' => $subscription, 'invoice' => $invoice, 'payment' => $payment];

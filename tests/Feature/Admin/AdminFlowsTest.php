@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Admin;
 
 use App\Models\User;
+use Database\Seeders\QueryTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Src\Modules\Billing\Application\DTO\CreatePlanInput;
 use Src\Modules\Billing\Application\UseCase\CreatePlan;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
@@ -177,6 +179,7 @@ final class AdminFlowsTest extends TestCase
         ));
 
         $this->actingAs($admin)
+            ->withConfirmedPassword()
             ->post("/admin/accounts/{$account->id->value}/assign-plan", ['plan_id' => $plan->id])
             ->assertRedirect();
 
@@ -207,6 +210,7 @@ final class AdminFlowsTest extends TestCase
         $providerId = ProviderModel::query()->where('identifier', 'api_brasil')->value('id');
 
         $this->actingAs($admin)
+            ->withConfirmedPassword()
             ->post("/admin/providers/{$providerId}/capabilities", [
                 'query_type' => 'cpf',
                 'priority' => 1,
@@ -263,6 +267,7 @@ final class AdminFlowsTest extends TestCase
         $account = app(CreateAccount::class)->handle(new CreateAccountInput('ACME', '11.222.333/0001-81'));
 
         $this->actingAs($admin)
+            ->withConfirmedPassword()
             ->post("/admin/accounts/{$account->id->value}/adjust", [
                 'delta' => 250,
                 'reason' => 'compensação manual',
@@ -275,6 +280,36 @@ final class AdminFlowsTest extends TestCase
             'type' => 'adjustment',
             'direction' => 'credit',
             'amount' => 250,
+        ]);
+    }
+
+    public function test_admin_can_view_and_update_query_type_cache_ttl(): void
+    {
+        $admin = $this->adminUser();
+        $this->seed(QueryTypeSeeder::class);
+
+        $queryTypeId = (string) DB::table('query_types')->where('code', 'cpf')->value('id');
+
+        $this->actingAs($admin)
+            ->get('/admin/query-types')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('admin/query-types/index')
+                ->has('query_types', 2)
+                ->where('query_types', fn ($types) => collect($types)->contains(fn ($row) => $row['code'] === 'cpf'))
+            );
+
+        $this->actingAs($admin)
+            ->from('/admin/query-types')
+            ->put("/admin/query-types/{$queryTypeId}", [
+                'cache_ttl_seconds' => 3600,
+            ])
+            ->assertRedirect('/admin/query-types')
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('query_types', [
+            'id' => $queryTypeId,
+            'cache_ttl_seconds' => 3600,
         ]);
     }
 }

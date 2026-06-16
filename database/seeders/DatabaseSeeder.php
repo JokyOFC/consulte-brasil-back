@@ -16,15 +16,16 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Admin de desenvolvimento.
-        User::updateOrCreate(
+        $user = User::updateOrCreate(
             ['email' => 'admin@consultebrasil.test'],
             [
                 'name' => 'Admin Consulte Brasil',
-                'role' => 'admin',
                 'password' => bcrypt('password'),
                 'email_verified_at' => now(),
             ],
         );
+
+        $user->forceFill(['role' => 'admin'])->save();
 
         $this->call([
             PlanSeeder::class,

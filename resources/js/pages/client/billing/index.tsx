@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MercadoPagoCardForm, parseAmountReais } from '@/components/mercado-pago-card-form';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -152,7 +153,7 @@ function PaymentResult({ payment }: { payment: PendingPayment }) {
     const [status, setStatus] = useState(payment.status);
 
     useEffect(() => {
-        if (status === 'approved' || payment.method === 'credit_card') {
+        if (status === 'approved' || status === 'rejected' || status === 'cancelled') {
             return;
         }
 
@@ -196,6 +197,16 @@ return;
             <Card className="gap-0 border-brand-green/40 bg-brand-green/5 py-0">
                 <CardContent className="flex items-center gap-2 p-5 text-sm font-medium text-brand-green">
                     <Check className="size-4" /> Pagamento confirmado! Seu saldo já foi atualizado.
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (status === 'rejected' || status === 'cancelled') {
+        return (
+            <Card className="gap-0 border-destructive/40 bg-destructive/5 py-0">
+                <CardContent className="p-5 text-sm text-destructive">
+                    Pagamento não aprovado. Verifique os dados do cartão ou escolha outra forma de pagamento.
                 </CardContent>
             </Card>
         );
@@ -265,8 +276,27 @@ const PAYMENT_METHODS: {
 }[] = [
     { id: 'pix', label: 'PIX', description: 'Confirmação rápida', icon: QrCode },
     { id: 'boleto', label: 'Boleto', description: 'Vence em 3 dias', icon: FileText },
-    { id: 'credit_card', label: 'Cartão', description: 'Em breve', icon: CreditCard },
+    { id: 'credit_card', label: 'Cartão', description: 'Aprovação imediata', icon: CreditCard },
 ];
+
+function postCardPayment(
+    url: string,
+    payload: Record<string, string | number>,
+    onSuccess: () => void,
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        router.post(url, payload, {
+            preserveScroll: true,
+            onSuccess: () => {
+                onSuccess();
+                resolve();
+            },
+            onError: () => {
+                reject(new Error('Pagamento recusado'));
+            },
+        });
+    });
+}
 
 function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method) => void }) {
     return (
@@ -274,20 +304,16 @@ function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method
             {PAYMENT_METHODS.map((option) => {
                 const Icon = option.icon;
                 const selected = value === option.id;
-                const disabled = option.id === 'credit_card';
-
                 return (
                     <button
                         key={option.id}
                         type="button"
-                        disabled={disabled}
                         onClick={() => onChange(option.id)}
                         className={cn(
                             'flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all',
                             selected
                                 ? 'border-brand-green bg-brand-green/10 ring-2 ring-brand-green/25'
                                 : 'border-border bg-background hover:border-brand-green/40 hover:bg-muted/30',
-                            disabled && 'cursor-not-allowed opacity-50',
                         )}
                     >
                         <div className="flex w-full items-center justify-between gap-2">
@@ -396,9 +422,12 @@ function PlanPicker({
 }
 
 function TopupDialog() {
+    const { mp_public_key, auth } = usePage<PageProps>().props;
+    const payerEmail = auth.user?.email ?? '';
     const [open, setOpen] = useState(false);
     const [method, setMethod] = useState<Method>('pix');
     const form = useForm({ amount: '50,00', method: 'pix' as Method, card_token: '' });
+    const amountCents = Math.round(parseAmountReais(form.data.amount) * 100);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -443,16 +472,34 @@ function TopupDialog() {
                         <MethodPicker value={method} onChange={setMethod} />
                     </div>
                     {method === 'credit_card' && (
-                        <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-                            Pagamento com cartão requer o checkout seguro do Mercado Pago. Use PIX ou boleto para
-                            confirmação imediata neste painel.
-                        </p>
+                        <MercadoPagoCardForm
+                            publicKey={mp_public_key}
+                            amountCents={amountCents}
+                            payerEmail={payerEmail}
+                            submitLabel="Pagar com cartão"
+                            onSubmit={(token) =>
+                                postCardPayment(
+                                    '/client/billing/topup',
+                                    {
+                                        amount: parseAmountReais(form.data.amount),
+                                        method: 'credit_card',
+                                        ...token,
+                                    },
+                                    () => {
+                                        form.reset();
+                                        setOpen(false);
+                                    },
+                                )
+                            }
+                        />
                     )}
-                    <DialogFooter>
-                        <Button type="submit" disabled={form.processing || method === 'credit_card'}>
-                            Gerar cobrança
-                        </Button>
-                    </DialogFooter>
+                    {method !== 'credit_card' && (
+                        <DialogFooter>
+                            <Button type="submit" disabled={form.processing}>
+                                Gerar cobrança
+                            </Button>
+                        </DialogFooter>
+                    )}
                 </form>
             </DialogContent>
         </Dialog>
@@ -575,7 +622,7 @@ function ActiveSubscriptionState({
                     icon={Zap}
                     label="Recarga mensal"
                     value={currentPlan ? formatBRL(currentPlan.recharge_cents) : '—'}
-                    hint="Creditado no saldo após pagamento"
+                    hint="Depositado no saldo após pagamento"
                 />
                 <SubscriptionDetailTile
                     icon={PaymentIcon}
@@ -692,7 +739,7 @@ function NoSubscriptionState({ plans }: { plans: PlanRow[] }) {
                     <div>
                         <h3 className="font-semibold">Recarga mensal automática</h3>
                         <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                            Escolha um plano e receba créditos no saldo todo mês, sem precisar recarregar manualmente.
+                            Escolha um plano e receba saldo na carteira todo mês, sem precisar recarregar manualmente.
                         </p>
                     </div>
                 </div>
@@ -733,6 +780,8 @@ function SubscribeDialog({
     initialPlanId?: string;
     trigger?: ReactNode;
 }) {
+    const { mp_public_key, auth } = usePage<PageProps>().props;
+    const payerEmail = auth.user?.email ?? '';
     const [internalOpen, setInternalOpen] = useState(false);
     const isControlled = open !== undefined;
     const dialogOpen = isControlled ? open : internalOpen;
@@ -816,13 +865,36 @@ function SubscribeDialog({
                         </div>
                     )}
 
+                    {method === 'credit_card' && selectedPlan && (
+                        <MercadoPagoCardForm
+                            publicKey={mp_public_key}
+                            amountCents={selectedPlan.price_cents}
+                            payerEmail={payerEmail}
+                            maxInstallments={1}
+                            submitLabel="Assinar com cartão"
+                            onSubmit={(token) =>
+                                postCardPayment(
+                                    '/client/billing/subscribe',
+                                    {
+                                        plan_id: form.data.plan_id,
+                                        method: 'credit_card',
+                                        ...token,
+                                    },
+                                    () => setDialogOpen(false),
+                                )
+                            }
+                        />
+                    )}
+
                     <DialogFooter className="gap-2 border-t border-border px-0 pt-4 sm:justify-between">
                         <p className="text-xs text-muted-foreground">
                             Você pode cancelar a assinatura a qualquer momento.
                         </p>
-                        <Button type="submit" disabled={form.processing || method === 'credit_card' || plans.length === 0} className="min-w-36">
-                            {form.processing ? 'Processando…' : 'Assinar agora'}
-                        </Button>
+                        {method !== 'credit_card' && (
+                            <Button type="submit" disabled={form.processing || plans.length === 0} className="min-w-36">
+                                {form.processing ? 'Processando…' : 'Assinar agora'}
+                            </Button>
+                        )}
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -938,6 +1010,8 @@ function InvoicesCard({ invoices }: { invoices: Invoice[] }) {
 }
 
 function PayInvoiceDialog({ invoice }: { invoice: Invoice }) {
+    const { mp_public_key, auth } = usePage<PageProps>().props;
+    const payerEmail = auth.user?.email ?? '';
     const [open, setOpen] = useState(false);
     const [method, setMethod] = useState<Method>('pix');
     const form = useForm({ invoice_id: invoice.id, method: 'pix' as Method });
@@ -968,11 +1042,32 @@ function PayInvoiceDialog({ invoice }: { invoice: Invoice }) {
                         <Label>Forma de pagamento</Label>
                         <MethodPicker value={method} onChange={setMethod} />
                     </div>
-                    <DialogFooter>
-                        <Button type="submit" disabled={form.processing || method === 'credit_card'}>
-                            Gerar cobrança
-                        </Button>
-                    </DialogFooter>
+                    {method === 'credit_card' && (
+                        <MercadoPagoCardForm
+                            publicKey={mp_public_key}
+                            amountCents={invoice.amount_cents}
+                            payerEmail={payerEmail}
+                            submitLabel="Pagar fatura"
+                            onSubmit={(token) =>
+                                postCardPayment(
+                                    '/client/billing/invoices/pay',
+                                    {
+                                        invoice_id: invoice.id,
+                                        method: 'credit_card',
+                                        ...token,
+                                    },
+                                    () => setOpen(false),
+                                )
+                            }
+                        />
+                    )}
+                    {method !== 'credit_card' && (
+                        <DialogFooter>
+                            <Button type="submit" disabled={form.processing}>
+                                Gerar cobrança
+                            </Button>
+                        </DialogFooter>
+                    )}
                 </form>
             </DialogContent>
         </Dialog>

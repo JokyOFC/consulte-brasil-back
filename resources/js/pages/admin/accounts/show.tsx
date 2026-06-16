@@ -13,9 +13,7 @@ import {
     Area,
     CartesianGrid,
     ComposedChart,
-    Legend,
     Line,
-    ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
@@ -23,10 +21,14 @@ import {
 import {
     CHART_COLORS,
     ChartEmptyState,
+    ChartLegend,
+    ChartResponsiveShell,
     MoneyChartTooltip,
     chartYDomainMax,
     formatChartDayLabel,
+    moneyChartLayout,
 } from '@/components/chart-utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { ConsultationStatusBadge } from '@/components/consultation-status-badge';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -156,13 +158,6 @@ interface Props {
 
 const brlTick = (v: number) => formatBRL(v);
 
-const chartAxisProps = {
-    tickLine: false,
-    axisLine: false,
-    fontSize: 11,
-    className: 'fill-muted-foreground',
-} as const;
-
 export default function AdminAccountShow({
     account,
     wallet,
@@ -177,23 +172,30 @@ export default function AdminAccountShow({
     plans,
 }: Props) {
     usePageFlash();
+    const isMobile = useIsMobile();
+    const chartLayout = moneyChartLayout(isMobile);
 
     const dailyChart = useMemo(
         () => daily.map((point) => ({ ...point, label: formatChartDayLabel(point.date) })),
         [daily],
     );
 
-    const dailyMax = useMemo(
-        () => Math.max(...daily.flatMap((point) => [point.consumption, point.payments]), 0),
+    const consumptionMax = useMemo(
+        () => Math.max(...daily.map((point) => point.consumption), 0),
         [daily],
     );
 
-    const hasDailyActivity = dailyMax > 0;
+    const paymentsMax = useMemo(
+        () => Math.max(...daily.map((point) => point.payments), 0),
+        [daily],
+    );
+
+    const hasDailyActivity = consumptionMax > 0 || paymentsMax > 0;
 
     return (
         <>
             <Head title={`Cliente — ${account.name}`} />
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title={account.name}
                     description={`${account.document_type.toUpperCase()} ${account.document}`}
@@ -242,53 +244,99 @@ export default function AdminAccountShow({
                     />
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <Card className="gap-0 py-0 lg:col-span-2">
+                <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+                    <Card className="min-w-0 gap-0 py-0 lg:col-span-2">
                         <CardHeader className="border-b border-border py-4">
                             <CardTitle className="text-base">Consumo e pagamentos</CardTitle>
                             <CardDescription>
                                 Últimos 14 dias · consumo {formatBRL(stats.consumption_total)} no total
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="p-4">
+                        <CardContent className="min-w-0 p-4">
                             {hasDailyActivity ? (
-                                <ResponsiveContainer width="100%" height={280}>
-                                    <ComposedChart data={dailyChart} margin={{ top: 12, right: 12, left: 4, bottom: 4 }}>
-                                        <defs>
-                                            <linearGradient id="consumptionFill" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={CHART_COLORS.consumption} stopOpacity={0.35} />
-                                                <stop offset="100%" stopColor={CHART_COLORS.consumption} stopOpacity={0.02} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
-                                        <XAxis dataKey="label" {...chartAxisProps} interval="preserveStartEnd" minTickGap={24} />
-                                        <YAxis
-                                            {...chartAxisProps}
-                                            tickFormatter={brlTick}
-                                            width={76}
-                                            domain={[0, chartYDomainMax(dailyMax)]}
-                                        />
-                                        <Tooltip content={<MoneyChartTooltip />} />
-                                        <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="consumption"
-                                            name="Consumo"
-                                            fill="url(#consumptionFill)"
-                                            stroke={CHART_COLORS.consumption}
-                                            strokeWidth={2}
-                                            dot={false}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="payments"
-                                            name="Pagamentos"
-                                            stroke={CHART_COLORS.revenue}
-                                            strokeWidth={2.5}
-                                            dot={{ r: 2, fill: CHART_COLORS.revenue, strokeWidth: 0 }}
-                                        />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
+                                <>
+                                    <ChartLegend
+                                        className="mb-3"
+                                        items={[
+                                            { label: 'Consumo', color: CHART_COLORS.consumption },
+                                            { label: 'Pagamentos', color: CHART_COLORS.revenue },
+                                        ]}
+                                    />
+                                    <ChartResponsiveShell height={chartLayout.height}>
+                                        {({ width, height }) => (
+                                            <ComposedChart
+                                                width={width}
+                                                height={height}
+                                                data={dailyChart}
+                                                margin={chartLayout.margin}
+                                            >
+                                                        <defs>
+                                                            <linearGradient id="accountConsumptionFill" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor={CHART_COLORS.consumption} stopOpacity={0.35} />
+                                                                <stop offset="100%" stopColor={CHART_COLORS.consumption} stopOpacity={0.02} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
+                                                        <XAxis
+                                                            dataKey="label"
+                                                            tickLine={false}
+                                                            axisLine={false}
+                                                            fontSize={chartLayout.tickFontSize}
+                                                            className="fill-muted-foreground"
+                                                            interval="preserveStartEnd"
+                                                            minTickGap={chartLayout.minTickGap}
+                                                            angle={chartLayout.xAxisAngle}
+                                                            textAnchor={chartLayout.xAxisTextAnchor}
+                                                            height={chartLayout.xAxisHeight}
+                                                        />
+                                                        <YAxis
+                                                            yAxisId="consumption"
+                                                            orientation="left"
+                                                            tickLine={false}
+                                                            axisLine={false}
+                                                            fontSize={chartLayout.tickFontSize}
+                                                            className="fill-muted-foreground"
+                                                            tickFormatter={brlTick}
+                                                            width={chartLayout.yAxisWidth}
+                                                            domain={[0, chartYDomainMax(consumptionMax)]}
+                                                            stroke={CHART_COLORS.consumption}
+                                                        />
+                                                        <YAxis
+                                                            yAxisId="payments"
+                                                            orientation="right"
+                                                            tickLine={false}
+                                                            axisLine={false}
+                                                            fontSize={chartLayout.tickFontSize}
+                                                            className="fill-muted-foreground"
+                                                            tickFormatter={brlTick}
+                                                            width={chartLayout.yAxisWidth}
+                                                            domain={[0, chartYDomainMax(paymentsMax)]}
+                                                            stroke={CHART_COLORS.revenue}
+                                                        />
+                                                        <Tooltip content={<MoneyChartTooltip />} />
+                                                        <Area
+                                                            yAxisId="consumption"
+                                                            type="monotone"
+                                                            dataKey="consumption"
+                                                            name="Consumo"
+                                                            fill="url(#accountConsumptionFill)"
+                                                            stroke={CHART_COLORS.consumption}
+                                                            strokeWidth={2}
+                                                            dot={false}
+                                                        />
+                                                        <Line
+                                                            yAxisId="payments"
+                                                            type="monotone"
+                                                            dataKey="payments"
+                                                            name="Pagamentos"
+                                                            stroke={CHART_COLORS.revenue}
+                                                            strokeWidth={2.5}
+                                                            dot={{ r: 2, fill: CHART_COLORS.revenue, strokeWidth: 0 }}
+                                                        />
+                                                    </ComposedChart>
+                                        )}
+                                    </ChartResponsiveShell>
+                                </>
                             ) : (
                                 <ChartEmptyState
                                     icon={Activity}
@@ -350,7 +398,7 @@ export default function AdminAccountShow({
 
                     <Card className="gap-0 py-0">
                         <CardHeader className="border-b border-border py-4">
-                            <CardTitle className="text-base">Movimentações de crédito</CardTitle>
+                            <CardTitle className="text-base">Movimentações da carteira</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             <DataTable
@@ -485,7 +533,7 @@ function SubscriptionCard({ subscription }: { subscription: Subscription | null 
                             <dd className="font-medium tabular-nums">{formatBRL(subscription.price_cents)}/mês</dd>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            <dt className="text-muted-foreground">Créditos/ciclo</dt>
+                            <dt className="text-muted-foreground">Saldo/ciclo</dt>
                             <dd className="tabular-nums">{formatBRL(subscription.included_credits)}</dd>
                         </div>
                         {subscription.next_billing_at && (

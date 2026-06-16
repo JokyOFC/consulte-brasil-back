@@ -16,4 +16,7 @@ interface QueryTypeCatalog
     public function exists(QueryType $type): bool;
 
     public function defaultCreditCost(QueryType $type): int;
+
+    /** TTL do cache em segundos (0 = desabilitado para este tipo). */
+    public function cacheTtlSeconds(QueryType $type): int;
 }

@@ -41,8 +41,8 @@ export default function AuthLayout({
                             Dados oficiais do Brasil, via API, sob demanda.
                         </h2>
                         <p className="max-w-sm text-sm leading-relaxed text-white/80">
-                            Integre consultas de CPF, CNPJ e mais ao seu sistema com créditos
-                            transparentes e chaves de API seguras.
+                            Integre consultas de CPF, CNPJ e mais ao seu sistema com saldo
+                            prepago e chaves de API seguras.
                         </p>
                     </div>
 
@@ -51,7 +51,7 @@ export default function AuthLayout({
                             <Dot /> Consultas de CPF, CNPJ e mais
                         </li>
                         <li className="flex items-center gap-2">
-                            <Dot /> Pague por uso com sistema de créditos
+                            <Dot /> Pague por uso com saldo na carteira
                         </li>
                         <li className="flex items-center gap-2">
                             <Dot /> Integração simples com chave de API

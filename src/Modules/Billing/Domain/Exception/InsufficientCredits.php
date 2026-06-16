@@ -13,7 +13,7 @@ final class InsufficientCredits extends DomainException
     public static function forWallet(WalletId $walletId, CreditAmount $available, CreditAmount $requested): self
     {
         return new self(sprintf(
-            'Insufficient credits on wallet [%s]: available %d, requested %d.',
+            'Saldo insuficiente na carteira [%s]: disponível %d, necessário %d.',
             $walletId->value,
             $available->value,
             $requested->value,

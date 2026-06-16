@@ -9,13 +9,19 @@ use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface;
+use Src\Modules\Consultation\Application\Port\ConsultationResultCache;
 use Src\Modules\Consultation\Application\Port\ProviderResolver;
 use Src\Modules\Consultation\Application\Service\ProviderRouter;
 use Src\Modules\Consultation\Domain\Port\QueryTypeCatalog;
 use Src\Modules\Consultation\Domain\Repository\ConsultationRepository;
+use Src\Modules\Consultation\Infrastructure\Cache\CacheConsultationResultCache;
 use Src\Modules\Consultation\Infrastructure\Console\PurgeConsultationRequestHashCommand;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentQueryTypeCatalog;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\QueryTypeModel;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\ProviderCapabilityCacheObserver;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\ProviderCacheObserver;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\QueryTypeCacheObserver;
 use Src\Modules\Consultation\Infrastructure\Provider\ApiBrasil\ApiBrasilAdapter;
 use Src\Modules\Consultation\Infrastructure\Provider\ApiBrasil\ApiBrasilHttpClient;
 use Src\Modules\Consultation\Infrastructure\Provider\ApiBrasil\ApiBrasilResponseMapper;
@@ -24,6 +30,8 @@ use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\CpfCnpjAdapter;
 use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\CpfCnpjHttpClient;
 use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\CpfCnpjResponseMapper;
 use Src\Modules\Provider\Domain\Repository\ProviderRepository;
+use Src\Modules\Provider\Infrastructure\Persistence\Eloquent\Models\ProviderCapabilityModel;
+use Src\Modules\Provider\Infrastructure\Persistence\Eloquent\Models\ProviderModel;
 
 final class ConsultationServiceProvider extends ServiceProvider
 {
@@ -89,11 +97,21 @@ final class ConsultationServiceProvider extends ServiceProvider
         $this->app->when(ProviderRouter::class)
             ->needs(LoggerInterface::class)
             ->give(fn () => Log::channel('consultation'));
+
+        $this->app->singleton(ConsultationResultCache::class, function (Application $app): CacheConsultationResultCache {
+            return new CacheConsultationResultCache(
+                cache: $app->make('cache')->store(),
+            );
+        });
     }
 
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/Persistence/Migrations');
+
+        QueryTypeModel::observe(QueryTypeCacheObserver::class);
+        ProviderModel::observe(ProviderCacheObserver::class);
+        ProviderCapabilityModel::observe(ProviderCapabilityCacheObserver::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([PurgeConsultationRequestHashCommand::class]);

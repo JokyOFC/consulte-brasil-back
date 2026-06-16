@@ -40,13 +40,14 @@ final class ExecuteConsultationTest extends TestCase
         return $account->id->value;
     }
 
-    private function seedQueryType(string $code = 'cpf', int $cost = 1): void
+    private function seedQueryType(string $code = 'cpf', int $cost = 1, ?int $cacheTtlSeconds = 3600): void
     {
         DB::table('query_types')->insert([
             'id' => app(IdGenerator::class)->generate(),
             'code' => $code,
             'name' => strtoupper($code),
             'default_credit_cost' => $cost,
+            'cache_ttl_seconds' => $cacheTtlSeconds,
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
@@ -174,5 +175,72 @@ final class ExecuteConsultationTest extends TestCase
         app(ExecuteConsultation::class)->handle(
             new ExecuteConsultationInput($accountId, null, 'cpf', [])
         );
+    }
+
+    public function test_second_identical_request_is_served_from_cache(): void
+    {
+        $accountId = $this->seedAccount(credits: 10);
+        $this->seedQueryType('cpf', cost: 3, cacheTtlSeconds: 3600);
+        $this->seedProvider('alpha', priceCents: 3);
+
+        $provider = new FakeProvider('alpha', payload: ['name' => 'João']);
+        $this->tagProvider($provider);
+
+        $input = new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '11144477735']);
+
+        $first = app(ExecuteConsultation::class)->handle($input);
+        $second = app(ExecuteConsultation::class)->handle($input);
+
+        $this->assertFalse($first->fromCache);
+        $this->assertTrue($second->fromCache);
+        $this->assertSame(['name' => 'João'], $second->data);
+        $this->assertSame(1, $provider->callCount);
+        $this->assertSame(4, app(WalletRepository::class)->findByAccountId($accountId)->balance()->value);
+    }
+
+    public function test_cache_can_be_disabled(): void
+    {
+        $accountId = $this->seedAccount(credits: 10);
+        $this->seedQueryType('cpf', cost: 3, cacheTtlSeconds: 0);
+        $this->app->forgetInstance(\Src\Modules\Consultation\Application\Port\ConsultationResultCache::class);
+        $this->seedProvider('alpha', priceCents: 3);
+
+        $provider = new FakeProvider('alpha', payload: ['name' => 'João']);
+        $this->tagProvider($provider);
+
+        $input = new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '11144477735']);
+
+        app(ExecuteConsultation::class)->handle($input);
+        $output = app(ExecuteConsultation::class)->handle($input);
+
+        $this->assertFalse($output->fromCache);
+        $this->assertSame(2, $provider->callCount);
+    }
+
+    public function test_cache_is_invalidated_automatically_when_query_type_ttl_changes(): void
+    {
+        $accountId = $this->seedAccount(credits: 20);
+        $this->seedQueryType('cpf', cost: 3, cacheTtlSeconds: 3600);
+        $this->seedProvider('alpha', priceCents: 3);
+
+        $provider = new FakeProvider('alpha', payload: ['name' => 'João']);
+        $this->tagProvider($provider);
+
+        $input = new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '11144477735']);
+
+        app(ExecuteConsultation::class)->handle($input);
+        $cached = app(ExecuteConsultation::class)->handle($input);
+        $this->assertTrue($cached->fromCache);
+        $this->assertSame(1, $provider->callCount);
+
+        $queryType = \Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\QueryTypeModel::query()
+            ->where('code', 'cpf')
+            ->firstOrFail();
+        $queryType->cache_ttl_seconds = 7200;
+        $queryType->save();
+
+        $afterInvalidation = app(ExecuteConsultation::class)->handle($input);
+        $this->assertFalse($afterInvalidation->fromCache);
+        $this->assertSame(2, $provider->callCount);
     }
 }

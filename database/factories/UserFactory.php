@@ -37,6 +37,30 @@ class UserFactory extends Factory
     }
 
     /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function create($attributes = [], ?\Illuminate\Database\Eloquent\Model $parent = null)
+    {
+        $role = $attributes['role'] ?? null;
+        $accountId = $attributes['account_id'] ?? null;
+        unset($attributes['role'], $attributes['account_id']);
+
+        /** @var User $user */
+        $user = parent::create($attributes, $parent);
+
+        $guarded = array_filter([
+            'role' => $role,
+            'account_id' => $accountId,
+        ], fn ($value) => $value !== null);
+
+        if ($guarded !== []) {
+            $user->forceFill($guarded)->save();
+        }
+
+        return $user;
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

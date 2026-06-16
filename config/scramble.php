@@ -33,7 +33,7 @@ return [
 
     'info' => [
         'version' => env('API_VERSION', '1.0.0'),
-        'description' => 'API pública do Consulte Brasil — consultas de dados oficiais com sistema de créditos.',
+        'description' => 'API pública do Consulte Brasil — consultas de dados oficiais com saldo prepago.',
     ],
 
     'ui' => [

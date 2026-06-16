@@ -20,10 +20,13 @@ Route::middleware(['auth', 'verified'])
 
         // Financeiro: carteira, recarga, faturas e assinatura
         Route::get('/billing', [ClientBillingController::class, 'index'])->name('billing.index');
-        Route::post('/billing/topup', [ClientBillingController::class, 'topup'])->name('billing.topup');
-        Route::post('/billing/invoices/pay', [ClientBillingController::class, 'payInvoice'])->name('billing.invoices.pay');
-        Route::post('/billing/subscribe', [ClientBillingController::class, 'subscribe'])->name('billing.subscribe');
-        Route::post('/billing/subscriptions/{subscriptionId}/cancel', [ClientBillingController::class, 'cancelSubscription'])->name('billing.subscriptions.cancel');
-        Route::post('/billing/subscriptions/{subscriptionId}/change', [ClientBillingController::class, 'changeSubscription'])->name('billing.subscriptions.change');
         Route::get('/billing/payments/{paymentId}/status', [ClientBillingController::class, 'paymentStatus'])->name('billing.payments.status');
+
+        Route::middleware('throttle:10,1')->group(function () {
+            Route::post('/billing/topup', [ClientBillingController::class, 'topup'])->name('billing.topup');
+            Route::post('/billing/invoices/pay', [ClientBillingController::class, 'payInvoice'])->name('billing.invoices.pay');
+            Route::post('/billing/subscribe', [ClientBillingController::class, 'subscribe'])->name('billing.subscribe');
+            Route::post('/billing/subscriptions/{subscriptionId}/cancel', [ClientBillingController::class, 'cancelSubscription'])->name('billing.subscriptions.cancel');
+            Route::post('/billing/subscriptions/{subscriptionId}/change', [ClientBillingController::class, 'changeSubscription'])->name('billing.subscriptions.change');
+        });
     });

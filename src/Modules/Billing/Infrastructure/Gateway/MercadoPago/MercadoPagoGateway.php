@@ -144,6 +144,11 @@ final class MercadoPagoGateway implements PaymentGateway
             : ($this->config['sandbox_public_key'] ?? $this->config['public_key'] ?? null);
     }
 
+    public function supportsAutomaticCardRecurring(): bool
+    {
+        return $this->isProduction();
+    }
+
     /** @param array<string, mixed> $extra */
     private function createPayment(GatewayChargeInput $input, array $extra): GatewayCharge
     {

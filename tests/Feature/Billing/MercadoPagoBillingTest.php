@@ -163,6 +163,35 @@ final class MercadoPagoBillingTest extends TestCase
         $this->assertSame('credit_card', $sub->payment_method);
     }
 
+    public function test_subscribe_with_card_in_sandbox_uses_manual_invoice_payment(): void
+    {
+        $this->gateway->automaticCardRecurringEnabled = false;
+        $this->gateway->nextChargeStatus = 'approved';
+
+        $accountId = $this->seedAccount();
+        $planId = $this->seedPlan(priceCents: 9900, includedCredits: 10000);
+
+        $result = app(SubscribeToPlan::class)->handle(new SubscribeToPlanInput(
+            accountId: $accountId,
+            planId: $planId,
+            method: PaymentMethod::CreditCard,
+            payerEmail: 'a@b.com',
+            backUrl: 'https://app/billing',
+            cardToken: 'tok_card',
+            paymentMethodId: 'visa',
+        ));
+
+        $this->assertArrayHasKey('payment', $result);
+        $this->assertSame(PaymentStatus::Approved, $result['payment']->status);
+        $this->assertDatabaseHas('subscriptions', [
+            'account_id' => $accountId,
+            'payment_method' => 'manual',
+            'status' => 'active',
+        ]);
+        $this->assertSame(10000, $this->balance($accountId));
+        $this->assertSame('credit_card', $this->gateway->charges[0]['method']);
+    }
+
     public function test_cancel_subscription_cancels_preapproval_remotely(): void
     {
         $accountId = $this->seedAccount();
@@ -177,7 +206,7 @@ final class MercadoPagoBillingTest extends TestCase
             cardToken: 'tok_card',
         ));
 
-        app(CancelSubscription::class)->handle($result['subscription']->id);
+        app(CancelSubscription::class)->handle($result['subscription']->id, $accountId);
 
         $this->assertSame(1, $this->gateway->cancelledPreapprovals);
         $this->assertDatabaseHas('subscriptions', ['id' => $result['subscription']->id, 'status' => 'cancelled']);

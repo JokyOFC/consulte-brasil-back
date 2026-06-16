@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\HandleAppearance;
@@ -25,9 +26,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        if (($proxies = env('TRUSTED_PROXIES')) !== null && $proxies !== '') {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
+
         $middleware->encryptCookies(except: ['appearance', 'theme', 'sidebar_state']);
 
         $middleware->web(append: [
+            AddSecurityHeaders::class,
             EnforceSessionTimeout::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
@@ -35,6 +41,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Trilha de auditoria de toda a API pública (corpo, headers, status…).
+        $middleware->api(prepend: [
+            AddSecurityHeaders::class,
+        ]);
         $middleware->api(append: [
             LogRequest::class,
         ]);

@@ -29,4 +29,25 @@ final class EloquentQueryTypeCatalog implements QueryTypeCatalog
 
         return (int) $model->default_credit_cost;
     }
+
+    public function cacheTtlSeconds(QueryType $type): int
+    {
+        $model = QueryTypeModel::query()->where('code', $type->code)->first();
+
+        if ($model === null) {
+            throw UnknownQueryType::withCode($type->code);
+        }
+
+        if ($model->cache_ttl_seconds !== null) {
+            return (int) $model->cache_ttl_seconds;
+        }
+
+        $configured = config("consultation.cache_ttl_by_query_type.{$type->code}");
+
+        if ($configured !== null) {
+            return (int) $configured;
+        }
+
+        return (int) config('consultation.default_cache_ttl_seconds', 86400);
+    }
 }

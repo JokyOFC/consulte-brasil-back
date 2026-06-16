@@ -5,7 +5,7 @@
 
     <p style="margin:0 0 16px;">
         Sua conta no Consulte Brasil foi criada com sucesso. A partir de agora você pode
-        integrar consultas de CPF, CNPJ e mais ao seu sistema com créditos transparentes.
+        integrar consultas de CPF, CNPJ e mais ao seu sistema com saldo prepago transparente.
     </p>
 
     <p style="margin:0 0 16px;">

@@ -111,10 +111,10 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                         hint={plan.billing_period === 'monthly' ? 'Receita recorrente estimada' : 'Plano avulso'}
                     />
                     <StatCard
-                        label="Créditos inclusos"
-                        value={plan.included_credits.toLocaleString('pt-BR')}
+                        label="Saldo incluso"
+                        value={formatBRL(plan.included_credits)}
                         icon={Coins}
-                        hint="Creditados por ciclo"
+                        hint="Adicionado à carteira por ciclo"
                     />
                 </div>
 
@@ -153,12 +153,12 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                             <ul className="space-y-2 text-sm">
                                 <li className="flex items-center gap-2">
                                     <Check className="size-4 text-brand-green" />
-                                    <strong>{plan.included_credits.toLocaleString('pt-BR')}</strong> créditos inclusos
+                                    <strong>{formatBRL(plan.included_credits)}</strong> de saldo incluso
                                 </li>
                                 {plan.overage_price_cents !== null && (
                                     <li className="flex items-center gap-2">
                                         <Check className="size-4 text-brand-green" />
-                                        Excedente: {formatBRL(plan.overage_price_cents)}/crédito
+                                        Excedente: {formatBRL(plan.overage_price_cents)}/consulta
                                     </li>
                                 )}
                                 <li className="flex items-center gap-2 text-muted-foreground">
@@ -238,7 +238,7 @@ function EditPlanForm({ plan }: { plan: Plan }) {
     const form = useForm({
         name: plan.name,
         price_reais: (plan.price_cents / 100).toFixed(2),
-        included_credits: String(plan.included_credits),
+        included_reais: (plan.included_credits / 100).toFixed(2),
         billing_period: plan.billing_period,
         overage_reais: plan.overage_price_cents !== null ? (plan.overage_price_cents / 100).toFixed(2) : '',
         status: plan.status,
@@ -249,7 +249,7 @@ function EditPlanForm({ plan }: { plan: Plan }) {
         form.transform((data) => ({
             name: data.name,
             price_cents: Math.round(Number(data.price_reais) * 100),
-            included_credits: Number(data.included_credits),
+            included_credits: Math.round(Number(data.included_reais) * 100),
             billing_period: data.billing_period,
             overage_price_cents: data.overage_reais === '' ? null : Math.round(Number(data.overage_reais) * 100),
             status: data.status,
@@ -280,12 +280,13 @@ function EditPlanForm({ plan }: { plan: Plan }) {
                         required
                     />
                 </FormField>
-                <FormField label="Créditos inclusos" error={form.errors.included_credits}>
+                <FormField label="Saldo incluso (R$)" error={form.errors.included_reais ?? (form.errors as Record<string, string>).included_credits}>
                     <Input
                         type="number"
                         min={0}
-                        value={form.data.included_credits}
-                        onChange={(e) => form.setData('included_credits', e.target.value)}
+                        step="0.01"
+                        value={form.data.included_reais}
+                        onChange={(e) => form.setData('included_reais', e.target.value)}
                         required
                     />
                 </FormField>
@@ -300,7 +301,7 @@ function EditPlanForm({ plan }: { plan: Plan }) {
                         </SelectContent>
                     </Select>
                 </FormField>
-                <FormField label="Excedente (R$/crédito, opcional)" error={form.errors.overage_reais ?? (form.errors as Record<string, string>).overage_price_cents}>
+                <FormField label="Excedente (R$/consulta, opcional)" error={form.errors.overage_reais ?? (form.errors as Record<string, string>).overage_price_cents}>
                     <Input
                         type="number"
                         min={0}

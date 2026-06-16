@@ -34,12 +34,12 @@
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/images/consulte-brasil-globo-logo.png">
 
-        <meta name="description" content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com sistema de créditos.">
+        <meta name="description" content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com saldo prepago.">
         <meta name="theme-color" content="#009c3b">
         <meta property="og:type" content="website">
         <meta property="og:site_name" content="{{ config('app.name', 'Consulte Brasil') }}">
         <meta property="og:title" content="{{ config('app.name', 'Consulte Brasil') }}">
-        <meta property="og:description" content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com sistema de créditos.">
+        <meta property="og:description" content="Plataforma de consulta de dados oficiais do Brasil via API. CPF, CNPJ e mais, com saldo prepago.">
         <meta property="og:image" content="{{ url('/images/consulte-brasil-logo-closer.png') }}">
         <meta name="twitter:card" content="summary">
 

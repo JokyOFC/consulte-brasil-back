@@ -27,6 +27,8 @@ final class FakePaymentGateway implements PaymentGateway
 
     public int $cancelledPreapprovals = 0;
 
+    public bool $automaticCardRecurringEnabled = true;
+
     private int $seq = 0;
 
     public function createPixPayment(GatewayChargeInput $input): GatewayCharge
@@ -63,6 +65,11 @@ final class FakePaymentGateway implements PaymentGateway
     public function publicKey(): ?string
     {
         return 'TEST-PUBLIC-KEY';
+    }
+
+    public function supportsAutomaticCardRecurring(): bool
+    {
+        return $this->automaticCardRecurringEnabled;
     }
 
     /** Registra como aprovado no MP o pagamento da cobrança nº $index (0-based). */
