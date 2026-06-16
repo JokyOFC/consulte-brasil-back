@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
+import { useChartSize } from '@/hooks/use-chart-size';
 import { formatBRL } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useChartSize } from '@/hooks/use-chart-size';
 
 interface ChartTooltipEntry {
     name?: string;

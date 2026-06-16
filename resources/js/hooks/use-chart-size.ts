@@ -6,12 +6,14 @@ export function useChartSize(height: number) {
 
     useEffect(() => {
         const element = ref.current;
+
         if (!element) {
             return;
         }
 
         const update = () => {
             const nextWidth = Math.floor(element.getBoundingClientRect().width);
+
             if (nextWidth > 0) {
                 setWidth(nextWidth);
             }

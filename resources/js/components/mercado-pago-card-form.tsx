@@ -42,7 +42,10 @@ export function MercadoPagoCardForm({
 }: MercadoPagoCardFormProps) {
     const brickId = useId().replace(/:/g, '');
     const onSubmitRef = useRef(onSubmit);
-    onSubmitRef.current = onSubmit;
+
+    useEffect(() => {
+        onSubmitRef.current = onSubmit;
+    }, [onSubmit]);
 
     useEffect(() => {
         if (publicKey) {

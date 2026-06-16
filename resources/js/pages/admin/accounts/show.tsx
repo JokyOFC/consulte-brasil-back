@@ -28,7 +28,6 @@ import {
     formatChartDayLabel,
     moneyChartLayout,
 } from '@/components/chart-utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { ConsultationStatusBadge } from '@/components/consultation-status-badge';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -45,6 +44,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { MercadoPagoCardForm, parseAmountReais } from '@/components/mercado-pago-card-form';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +34,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MercadoPagoCardForm, parseAmountReais } from '@/components/mercado-pago-card-form';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -304,6 +304,7 @@ function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method
             {PAYMENT_METHODS.map((option) => {
                 const Icon = option.icon;
                 const selected = value === option.id;
+
                 return (
                     <button
                         key={option.id}

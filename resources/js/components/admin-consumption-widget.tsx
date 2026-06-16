@@ -52,6 +52,7 @@ function MiniSparkline({ data }: { data: DailyPoint[] }) {
         <svg viewBox="0 0 56 16" className="h-3.5 w-14 shrink-0" aria-hidden>
             {recent.map((point, i) => {
                 const h = Math.max(2, (point.consumption_cents / max) * 14);
+
                 return (
                     <rect
                         key={point.full_date}

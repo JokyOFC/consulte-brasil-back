@@ -30,7 +30,8 @@ import {
 } from '@/components/chart-utils';
 import { ConsultationStatusBadge } from '@/components/consultation-status-badge';
 import { PageHeader } from '@/components/page-header';
-import { ProviderBalanceDisplay, type ProviderBalance } from '@/components/provider-balance-display';
+import { ProviderBalanceDisplay  } from '@/components/provider-balance-display';
+import type {ProviderBalance} from '@/components/provider-balance-display';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -29,16 +29,20 @@ function compactLabel(balance: ProviderBalance): string {
         if (balance.total != null) {
             return `${formatCredits(balance.total)} créditos`;
         }
+
         if (balance.packages?.length === 1) {
             return `${formatCredits(balance.packages[0].balance)} créditos`;
         }
     }
+
     if (balance.status === 'unsupported') {
         return 'N/A';
     }
+
     if (balance.status === 'no_token') {
         return 'Sem token';
     }
+
     return 'Indisponível';
 }
 
@@ -57,11 +61,13 @@ export function ProviderBalanceDisplay({
         }
 
         setLoading(true);
+
         try {
             const response = await fetch(`/admin/providers/${providerId}/balance`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
+
             if (response.ok) {
                 const data = await response.json();
                 setBalance(data.balance);

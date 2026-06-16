@@ -2,11 +2,13 @@ import { formatQueryTypeLabel } from '@/components/chart-utils';
 
 export function queryTypeCategory(name: string, code: string): string {
     const separator = name.indexOf(' — ');
+
     if (separator > 0) {
         return name.slice(0, separator);
     }
 
     const parts = code.split('_');
+
     if (parts[0] === 'ab' && parts[1]) {
         return parts[1].toUpperCase();
     }
@@ -24,6 +26,7 @@ export function queryTypeDisplayName(name: string | null | undefined, code: stri
 
 export function queryTypeShortName(name: string, category: string): string {
     const prefix = `${category} — `;
+
     if (name.startsWith(prefix)) {
         return name.slice(prefix.length);
     }

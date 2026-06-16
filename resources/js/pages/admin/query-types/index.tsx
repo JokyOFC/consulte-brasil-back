@@ -24,14 +24,15 @@ import {
     daysToSeconds,
     formatCacheTtl,
     resolveCacheTtlMode,
-    secondsToDays,
-    type CacheTtlSource,
+    secondsToDays
+    
 } from '@/lib/cache-ttl';
+import type {CacheTtlSource} from '@/lib/cache-ttl';
+import { formatBRL } from '@/lib/format';
 import {
     groupByQueryTypeCategory,
     queryTypeShortName,
 } from '@/lib/query-type-display';
-import { formatBRL } from '@/lib/format';
 
 interface CachePreset {
     label: string;
@@ -130,6 +131,7 @@ function EditCacheTtlDialog({
 
     function handleOpenChange(nextOpen: boolean): void {
         setOpen(nextOpen);
+
         if (nextOpen) {
             resetFormState();
         }
@@ -418,6 +420,7 @@ export default function AdminQueryTypesIndex() {
 
     const filteredTypes = useMemo(() => {
         const term = search.trim().toLowerCase();
+
         if (!term) {
             return query_types;
         }
