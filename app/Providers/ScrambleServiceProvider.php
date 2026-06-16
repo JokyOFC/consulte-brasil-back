@@ -2,20 +2,16 @@
 
 namespace App\Providers;
 
-use App\Models\User;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecuritySchemes\HttpSecurityScheme;
 use Dedoc\Scramble\Support\Generator\Tag;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class ScrambleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        Gate::define('viewApiDocs', fn (?User $user = null) => $user !== null && $user->role === 'admin');
-
         Scramble::afterOpenApiGenerated(function (OpenApi $openApi): void {
             $openApi->info->setDescription($this->introduction());
 

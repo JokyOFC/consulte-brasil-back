@@ -19,6 +19,7 @@ use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Billing\Infrastructure\Cache\CacheCreditBalanceCache;
 use Src\Modules\Billing\Infrastructure\Console\ReconcileBalancesCommand;
 use Src\Modules\Billing\Infrastructure\Console\RunRecurringBillingCommand;
+use Src\Modules\Billing\Infrastructure\Console\SyncPaymentsCommand;
 use Src\Modules\Billing\Infrastructure\Gateway\MercadoPago\MercadoPagoGateway;
 use Src\Modules\Billing\Infrastructure\Listeners\ProvisionWalletForAccount;
 use Src\Modules\Billing\Infrastructure\Listeners\SendPaymentConfirmedEmail;
@@ -75,6 +76,7 @@ final class BillingServiceProvider extends ServiceProvider
             $this->commands([
                 ReconcileBalancesCommand::class,
                 RunRecurringBillingCommand::class,
+                SyncPaymentsCommand::class,
             ]);
         }
     }
