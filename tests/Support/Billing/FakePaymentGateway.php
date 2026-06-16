@@ -27,6 +27,9 @@ final class FakePaymentGateway implements PaymentGateway
 
     public int $cancelledPreapprovals = 0;
 
+    /** @var list<string> */
+    public array $cancelledPayments = [];
+
     public bool $automaticCardRecurringEnabled = true;
 
     private int $seq = 0;
@@ -58,8 +61,31 @@ final class FakePaymentGateway implements PaymentGateway
 
     public function getPayment(string $mpPaymentId): GatewayPaymentStatus
     {
-        return $this->remoteStatuses[$mpPaymentId]
-            ?? new GatewayPaymentStatus($mpPaymentId, 'approved', 0, null);
+        if (isset($this->remoteStatuses[$mpPaymentId])) {
+            return $this->remoteStatuses[$mpPaymentId];
+        }
+
+        foreach ($this->charges as $charge) {
+            if ($charge['id'] !== $mpPaymentId) {
+                continue;
+            }
+
+            $status = $charge['method'] === 'credit_card' ? 'approved' : $this->nextChargeStatus;
+
+            return new GatewayPaymentStatus(
+                mpPaymentId: $mpPaymentId,
+                status: $status,
+                amountCents: $charge['input']->amountCents,
+                externalReference: $charge['input']->externalReference,
+            );
+        }
+
+        return new GatewayPaymentStatus($mpPaymentId, 'approved', 0, null);
+    }
+
+    public function cancelPayment(string $mpPaymentId): void
+    {
+        $this->cancelledPayments[] = $mpPaymentId;
     }
 
     public function publicKey(): ?string

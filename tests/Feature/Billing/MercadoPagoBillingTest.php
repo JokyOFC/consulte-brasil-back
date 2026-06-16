@@ -8,13 +8,19 @@ use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Src\Modules\Billing\Application\DTO\CreateWalletTopupInput;
+use Src\Modules\Billing\Application\DTO\PayInvoiceInput;
 use Src\Modules\Billing\Application\DTO\SubscribeToPlanInput;
+use Src\Modules\Billing\Application\Gateway\GatewayPaymentStatus;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Application\UseCase\CancelInvoice;
 use Src\Modules\Billing\Application\UseCase\CancelSubscription;
 use Src\Modules\Billing\Application\UseCase\CreateWalletTopup;
 use Src\Modules\Billing\Application\UseCase\HandleMercadoPagoWebhook;
+use Src\Modules\Billing\Application\UseCase\PayInvoice;
 use Src\Modules\Billing\Application\UseCase\RunRecurringBilling;
 use Src\Modules\Billing\Application\UseCase\SubscribeToPlan;
+use Src\Modules\Billing\Application\UseCase\SyncPaymentStatus;
+use Src\Modules\Billing\Domain\Exception\InvoiceNotCancelable;
 use Src\Modules\Billing\Domain\Entity\Invoice;
 use Src\Modules\Billing\Domain\Entity\InvoiceItem;
 use Src\Modules\Billing\Domain\Entity\Subscription;
@@ -72,6 +78,43 @@ final class MercadoPagoBillingTest extends TestCase
     private function balance(string $accountId): int
     {
         return app(WalletRepository::class)->findByAccountId($accountId)?->balance()->value ?? 0;
+    }
+
+    private function seedOpenInvoice(string $accountId): string
+    {
+        $planId = $this->seedPlan();
+        $subscriptionId = app(IdGenerator::class)->generate();
+        $now = new DateTimeImmutable;
+        $invoiceId = app(IdGenerator::class)->generate();
+
+        app(SubscriptionRepository::class)->save(new Subscription(
+            id: $subscriptionId,
+            accountId: $accountId,
+            planId: $planId,
+            status: SubscriptionStatus::Active,
+            paymentMethod: 'manual',
+            currentPeriodStart: $now,
+            currentPeriodEnd: $now->modify('+30 days'),
+            renewsAt: $now->modify('+30 days'),
+            nextBillingAt: $now->modify('+30 days'),
+            createdAt: $now,
+        ));
+
+        app(InvoiceRepository::class)->save(new Invoice(
+            id: $invoiceId,
+            accountId: $accountId,
+            subscriptionId: $subscriptionId,
+            status: InvoiceStatus::Open,
+            amountCents: 9900,
+            description: 'Plano Pro',
+            dueDate: $now,
+            periodStart: $now,
+            periodEnd: $now->modify('+30 days'),
+            items: [new InvoiceItem(app(IdGenerator::class)->generate(), 'Plano Pro', 9900)],
+            createdAt: $now,
+        ));
+
+        return $invoiceId;
     }
 
     public function test_pix_topup_only_credits_wallet_after_approved_webhook_and_is_idempotent(): void
@@ -262,5 +305,110 @@ final class MercadoPagoBillingTest extends TestCase
         $accountId = $this->seedAccount();
         app(HandleMercadoPagoWebhook::class)->handle('preapproval', 'pre_1');
         $this->assertSame(0, $this->balance($accountId));
+    }
+
+    public function test_sync_payment_status_updates_pix_from_mp_and_credits_wallet(): void
+    {
+        $accountId = $this->seedAccount();
+
+        $payment = app(CreateWalletTopup::class)->handle(new CreateWalletTopupInput(
+            accountId: $accountId,
+            amountCents: 5000,
+            method: PaymentMethod::Pix,
+            payerEmail: 'a@b.com',
+        ));
+
+        $mpId = $payment->mpPaymentId;
+        $this->assertNotNull($mpId);
+        $this->gateway->remoteStatuses[$mpId] = new GatewayPaymentStatus(
+            mpPaymentId: $mpId,
+            status: 'approved',
+            amountCents: 5000,
+            externalReference: "payment:{$payment->id}",
+        );
+
+        $synced = app(SyncPaymentStatus::class)->handle($payment->id);
+
+        $this->assertSame(PaymentStatus::Approved, $synced->status);
+        $this->assertSame(5000, $this->balance($accountId));
+    }
+
+    public function test_cancel_invoice_without_pending_payment(): void
+    {
+        $accountId = $this->seedAccount();
+        $planId = $this->seedPlan();
+        $subscriptionId = app(IdGenerator::class)->generate();
+        $now = new DateTimeImmutable;
+
+        app(SubscriptionRepository::class)->save(new Subscription(
+            id: $subscriptionId,
+            accountId: $accountId,
+            planId: $planId,
+            status: SubscriptionStatus::Active,
+            paymentMethod: 'manual',
+            currentPeriodStart: $now,
+            currentPeriodEnd: $now->modify('+30 days'),
+            renewsAt: $now->modify('+30 days'),
+            nextBillingAt: $now->modify('+30 days'),
+            createdAt: $now,
+        ));
+
+        $invoiceId = app(IdGenerator::class)->generate();
+        app(InvoiceRepository::class)->save(new Invoice(
+            id: $invoiceId,
+            accountId: $accountId,
+            subscriptionId: $subscriptionId,
+            status: InvoiceStatus::Open,
+            amountCents: 9900,
+            description: 'Plano Pro',
+            dueDate: $now,
+            periodStart: $now,
+            periodEnd: $now->modify('+30 days'),
+            items: [new InvoiceItem(app(IdGenerator::class)->generate(), 'Plano Pro', 9900)],
+            createdAt: $now,
+        ));
+
+        app(CancelInvoice::class)->handle($invoiceId, $accountId);
+
+        $this->assertDatabaseHas('invoices', ['id' => $invoiceId, 'status' => 'canceled']);
+    }
+
+    public function test_cancel_invoice_blocked_during_grace_period(): void
+    {
+        $accountId = $this->seedAccount();
+        $invoiceId = $this->seedOpenInvoice($accountId);
+
+        app(PayInvoice::class)->handle(new PayInvoiceInput(
+            accountId: $accountId,
+            invoiceId: $invoiceId,
+            method: PaymentMethod::Pix,
+            payerEmail: 'a@b.com',
+        ));
+
+        $this->expectException(InvoiceNotCancelable::class);
+        app(CancelInvoice::class)->handle($invoiceId, $accountId);
+    }
+
+    public function test_cancel_invoice_after_grace_cancels_pending_payment(): void
+    {
+        $accountId = $this->seedAccount();
+        $invoiceId = $this->seedOpenInvoice($accountId);
+
+        $payment = app(PayInvoice::class)->handle(new PayInvoiceInput(
+            accountId: $accountId,
+            invoiceId: $invoiceId,
+            method: PaymentMethod::Pix,
+            payerEmail: 'a@b.com',
+        ));
+
+        DB::table('payments')->where('id', $payment->id)->update([
+            'created_at' => now()->subMinutes(3),
+        ]);
+
+        app(CancelInvoice::class)->handle($invoiceId, $accountId);
+
+        $this->assertDatabaseHas('invoices', ['id' => $invoiceId, 'status' => 'canceled']);
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'status' => 'cancelled']);
+        $this->assertContains($payment->mpPaymentId, $this->gateway->cancelledPayments);
     }
 }

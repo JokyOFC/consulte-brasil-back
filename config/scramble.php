@@ -163,7 +163,8 @@ return [
         \Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy::class,
         [
             'middleware' => ['auth:api'],
-            'scheme' => \Dedoc\Scramble\Support\Generator\SecurityScheme::http('bearer', 'API Key'),
+            // scheme definido em runtime pelo MiddlewareAuthSecurityStrategy (bearer).
+            // Não instanciar SecurityScheme aqui — quebra o php artisan config:cache.
         ],
     ],
 ];

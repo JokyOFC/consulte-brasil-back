@@ -28,6 +28,8 @@ interface PaymentGateway
 
     public function getPayment(string $mpPaymentId): GatewayPaymentStatus;
 
+    public function cancelPayment(string $mpPaymentId): void;
+
     /** Public key do ambiente atual (para o Bricks/MP.js no front). */
     public function publicKey(): ?string;
 

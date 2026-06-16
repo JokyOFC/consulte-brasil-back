@@ -13,4 +13,6 @@ interface PaymentRepository
     public function findById(string $id): ?Payment;
 
     public function findByMpPaymentId(string $mpPaymentId): ?Payment;
+
+    public function findLatestPendingByInvoiceId(string $invoiceId): ?Payment;
 }

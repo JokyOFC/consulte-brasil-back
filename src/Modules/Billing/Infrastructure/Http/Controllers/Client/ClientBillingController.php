@@ -13,12 +13,16 @@ use Src\Modules\Billing\Application\DTO\CreateWalletTopupInput;
 use Src\Modules\Billing\Application\DTO\PayInvoiceInput;
 use Src\Modules\Billing\Application\DTO\SubscribeToPlanInput;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Application\UseCase\CancelInvoice;
 use Src\Modules\Billing\Application\UseCase\CancelSubscription;
 use Src\Modules\Billing\Application\UseCase\ChangeSubscription;
 use Src\Modules\Billing\Application\UseCase\CreateWalletTopup;
 use Src\Modules\Billing\Application\UseCase\PayInvoice;
 use Src\Modules\Billing\Application\UseCase\SubscribeToPlan;
+use Src\Modules\Billing\Application\UseCase\SyncPaymentStatus;
 use Src\Modules\Billing\Domain\Entity\Payment;
+use Src\Modules\Billing\Domain\Exception\InvoiceNotCancelable;
+use Src\Modules\Billing\Domain\Exception\PaymentNotFound;
 use Src\Modules\Billing\Domain\Repository\PlanRepository;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\CreditTransactionModel;
@@ -34,7 +38,7 @@ use Src\Modules\Billing\Domain\ValueObject\PaymentMethod;
  */
 final class ClientBillingController
 {
-    public function index(Request $request, WalletRepository $wallets, PlanRepository $plans, PaymentGateway $gateway): Response
+    public function index(Request $request, WalletRepository $wallets, PlanRepository $plans, PaymentGateway $gateway, CancelInvoice $cancelInvoice): Response
     {
         $accountId = $request->user()->account_id;
         $wallet = $accountId !== null ? $wallets->findByAccountId($accountId) : null;
@@ -44,13 +48,18 @@ final class ClientBillingController
             ->whereIn('status', ['open', 'overdue'])
             ->orderBy('due_date')
             ->get()
-            ->map(fn (InvoiceModel $i) => [
-                'id' => $i->id,
-                'status' => $i->status,
-                'amount_cents' => (int) $i->amount_cents,
-                'description' => $i->description,
-                'due_date' => optional($i->due_date)->toDateString(),
-            ])->all();
+            ->map(function (InvoiceModel $i) use ($accountId, $cancelInvoice) {
+                $cancelableAt = $cancelInvoice->cancelableAtForInvoice($i->id, $accountId);
+
+                return [
+                    'id' => $i->id,
+                    'status' => $i->status,
+                    'amount_cents' => (int) $i->amount_cents,
+                    'description' => $i->description,
+                    'due_date' => optional($i->due_date)->toDateString(),
+                    'cancelable_at' => $cancelableAt?->format('c'),
+                ];
+            })->all();
 
         $subscriptionModel = $accountId === null ? null : SubscriptionModel::query()
             ->where('account_id', $accountId)
@@ -218,18 +227,28 @@ final class ClientBillingController
         return back()->with('success', 'Plano alterado.');
     }
 
-    public function paymentStatus(string $paymentId, Request $request): JsonResponse
+    public function cancelInvoice(string $invoiceId, Request $request, CancelInvoice $cancel): RedirectResponse
     {
-        $payment = PaymentModel::query()
-            ->where('id', $paymentId)
-            ->where('account_id', $request->user()->account_id)
-            ->first();
+        try {
+            $cancel->handle($invoiceId, $this->requireAccountId($request));
+        } catch (InvoiceNotCancelable $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
-        abort_if($payment === null, 404);
+        return back()->with('success', 'Fatura cancelada.');
+    }
+
+    public function paymentStatus(string $paymentId, Request $request, SyncPaymentStatus $sync): JsonResponse
+    {
+        try {
+            $payment = $sync->handle($paymentId, $request->user()->account_id);
+        } catch (PaymentNotFound) {
+            abort(404);
+        }
 
         return response()->json([
             'id' => $payment->id,
-            'status' => $payment->status,
+            'status' => $payment->status->value,
         ]);
     }
 

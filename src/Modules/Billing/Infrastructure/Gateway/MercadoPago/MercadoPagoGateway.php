@@ -137,6 +137,19 @@ final class MercadoPagoGateway implements PaymentGateway
         );
     }
 
+    public function cancelPayment(string $mpPaymentId): void
+    {
+        $this->configure();
+
+        try {
+            (new PaymentClient)->update((int) $mpPaymentId, ['status' => 'cancelled'], $this->requestOptions());
+        } catch (MPApiException $e) {
+            throw PaymentGatewayError::from($this->describe($e));
+        } catch (Throwable $e) {
+            throw PaymentGatewayError::from($e->getMessage());
+        }
+    }
+
     public function publicKey(): ?string
     {
         return $this->isProduction()

@@ -54,6 +54,17 @@ final class EloquentPaymentRepository implements PaymentRepository
         return $model === null ? null : $this->toEntity($model);
     }
 
+    public function findLatestPendingByInvoiceId(string $invoiceId): ?Payment
+    {
+        $model = PaymentModel::query()
+            ->where('invoice_id', $invoiceId)
+            ->whereIn('status', ['pending', 'in_process'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        return $model === null ? null : $this->toEntity($model);
+    }
+
     private function toEntity(PaymentModel $m): Payment
     {
         return new Payment(

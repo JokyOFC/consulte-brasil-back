@@ -25,6 +25,7 @@ Route::middleware(['auth', 'verified'])
         Route::middleware('throttle:10,1')->group(function () {
             Route::post('/billing/topup', [ClientBillingController::class, 'topup'])->name('billing.topup');
             Route::post('/billing/invoices/pay', [ClientBillingController::class, 'payInvoice'])->name('billing.invoices.pay');
+            Route::post('/billing/invoices/{invoiceId}/cancel', [ClientBillingController::class, 'cancelInvoice'])->name('billing.invoices.cancel');
             Route::post('/billing/subscribe', [ClientBillingController::class, 'subscribe'])->name('billing.subscribe');
             Route::post('/billing/subscriptions/{subscriptionId}/cancel', [ClientBillingController::class, 'cancelSubscription'])->name('billing.subscriptions.cancel');
             Route::post('/billing/subscriptions/{subscriptionId}/change', [ClientBillingController::class, 'changeSubscription'])->name('billing.subscriptions.change');

@@ -52,6 +52,7 @@ interface Invoice {
     amount_cents: number;
     description: string | null;
     due_date: string | null;
+    cancelable_at: string | null;
 }
 
 interface Subscription {
@@ -174,6 +175,10 @@ return;
                     clearInterval(timer);
                     router.reload({ only: ['wallet', 'invoices', 'payments', 'transactions'] });
                 }
+
+                if (data.status === 'rejected' || data.status === 'cancelled') {
+                    clearInterval(timer);
+                }
             } catch {
                 /* ignora falha de polling */
             }
@@ -221,7 +226,7 @@ return;
                         {payment.method === 'pix' ? 'PIX' : payment.method === 'boleto' ? 'Boleto' : 'Cartão'}
                     </div>
                     <Badge variant="outline" className="border-transparent bg-amber-100 text-amber-700">
-                        Aguardando pagamento
+                        {status === 'in_process' ? 'Confirmando pagamento' : 'Aguardando pagamento'}
                     </Badge>
                 </div>
 
@@ -992,7 +997,10 @@ function InvoicesCard({ invoices }: { invoices: Invoice[] }) {
                                     </Badge>
                                 </td>
                                 <td className="px-6 py-3 text-right">
-                                    <PayInvoiceDialog invoice={inv} />
+                                    <div className="flex items-center justify-end gap-2">
+                                        <CancelInvoiceButton invoice={inv} />
+                                        <PayInvoiceDialog invoice={inv} />
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -1008,6 +1016,86 @@ function InvoicesCard({ invoices }: { invoices: Invoice[] }) {
             </CardContent>
         </Card>
     );
+}
+
+function CancelInvoiceButton({ invoice }: { invoice: Invoice }) {
+    const [cancelableAt, setCancelableAt] = useState<string | null>(invoice.cancelable_at);
+    const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(cancelableAt));
+
+    useEffect(() => {
+        setCancelableAt(invoice.cancelable_at);
+    }, [invoice.cancelable_at]);
+
+    useEffect(() => {
+        if (!cancelableAt) {
+            setSecondsLeft(0);
+            return;
+        }
+
+        setSecondsLeft(secondsUntil(cancelableAt));
+
+        const timer = setInterval(() => {
+            const remaining = secondsUntil(cancelableAt);
+            setSecondsLeft(remaining);
+
+            if (remaining <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [cancelableAt]);
+
+    const canCancel = secondsLeft <= 0;
+
+    const cancel = () => {
+        if (!canCancel) {
+            return;
+        }
+
+        if (!confirm('Cancelar esta fatura? Cobranças pendentes serão encerradas.')) {
+            return;
+        }
+
+        router.post(
+            `/client/billing/invoices/${invoice.id}/cancel`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
+    return (
+        <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+            disabled={!canCancel}
+            onClick={cancel}
+        >
+            {canCancel ? 'Cancelar' : formatCountdown(secondsLeft)}
+        </Button>
+    );
+}
+
+function secondsUntil(isoDate: string | null): number {
+    if (!isoDate) {
+        return 0;
+    }
+
+    const target = new Date(isoDate).getTime();
+
+    if (Number.isNaN(target)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.ceil((target - Date.now()) / 1000));
+}
+
+function formatCountdown(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function PayInvoiceDialog({ invoice }: { invoice: Invoice }) {
@@ -1077,7 +1165,13 @@ function PayInvoiceDialog({ invoice }: { invoice: Invoice }) {
 
 function HistoryCard({ title, rows }: { title: string; rows: PaymentRow[] }) {
     const label = (s: string) =>
-        ({ approved: 'Aprovado', pending: 'Pendente', rejected: 'Recusado', cancelled: 'Cancelado' })[s] ?? s;
+        ({
+            approved: 'Aprovado',
+            pending: 'Pendente',
+            in_process: 'Processando',
+            rejected: 'Recusado',
+            cancelled: 'Cancelado',
+        })[s] ?? s;
 
     return (
         <Card className="gap-0 py-0">
