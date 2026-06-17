@@ -52,6 +52,8 @@ final class ApiBrasilCatalogSeeder extends Seeder
             ['endpoint' => 'dados/cpf/credits', 'group' => 'cpf', 'key' => 'cpf', 'tipo' => 'quod-restricao-pf', 'homolog' => true]],
         ['ab_cpf_acerta', 'CPF — Acerta Essencial', 'Análise de crédito Acerta Essencial (PF).', 1.20,
             ['endpoint' => 'dados/cpf/credits', 'group' => 'cpf', 'key' => 'cpf', 'tipo' => 'acerta-essencial', 'homolog' => true]],
+        ['cpf_analise_credito_basic', 'CPF — Análise de crédito básica', 'Análise de crédito básica para pessoa física.', 1.20,
+            ['endpoint' => 'dados/cpf/credits', 'group' => 'cpf', 'key' => 'cpf', 'tipo' => 'analise-credito-basic-pf', 'homolog' => true]],
         ['ab_cpf_acerta_positivo', 'CPF — Acerta Essencial+', 'Acerta Essencial com cadastro positivo (PF).', 1.50,
             ['endpoint' => 'dados/cpf/credits', 'group' => 'cpf', 'key' => 'cpf', 'tipo' => 'acerta-essencial-positivo', 'homolog' => true]],
         ['ab_cpf_serasa_premium', 'CPF — Serasa Premium', 'Relatório premium de crédito (Serasa, PF).', 2.50,
@@ -88,6 +90,8 @@ final class ApiBrasilCatalogSeeder extends Seeder
             ['endpoint' => 'dados/lista-cnaes', 'group' => 'cnpj', 'tipo' => 'lista-cnaes', 'homolog' => true]],
         ['ab_cnpj_quod', 'CNPJ — Quod (restrições)', 'Restrições de crédito Quod (PJ).', 1.80,
             ['endpoint' => 'dados/cnpj/credits', 'group' => 'cnpj', 'key' => 'cnpj', 'tipo' => 'quod-restricao-pj', 'homolog' => true]],
+        ['cnpj_creditos_simples', 'CNPJ — Créditos simples', 'Consulta de créditos simples para pessoa jurídica.', 1.50,
+            ['endpoint' => 'dados/cnpj/credits', 'group' => 'cnpj', 'key' => 'cnpj', 'tipo' => 'creditos-simples-pj', 'homolog' => true]],
         ['ab_cnpj_serasa_premium', 'CNPJ — Serasa Premium', 'Relatório premium de crédito (Serasa, PJ).', 2.50,
             ['endpoint' => 'dados/cnpj/credits', 'group' => 'cnpj', 'key' => 'cnpj', 'tipo' => 'serasa-premium-pj', 'homolog' => true]],
 

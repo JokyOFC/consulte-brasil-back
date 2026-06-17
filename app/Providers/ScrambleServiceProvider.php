@@ -7,6 +7,7 @@ use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecuritySchemes\HttpSecurityScheme;
 use Dedoc\Scramble\Support\Generator\Tag;
 use Illuminate\Support\ServiceProvider;
+use Src\Modules\Consultation\Infrastructure\Documentation\ConsultQueryTypeDocumentation;
 
 class ScrambleServiceProvider extends ServiceProvider
 {
@@ -14,6 +15,7 @@ class ScrambleServiceProvider extends ServiceProvider
     {
         Scramble::afterOpenApiGenerated(function (OpenApi $openApi): void {
             $openApi->info->setDescription($this->introduction());
+            $this->applyConsultEndpointDocumentation($openApi);
 
             foreach ($openApi->components->securitySchemes as $scheme) {
                 if ($scheme instanceof HttpSecurityScheme && $scheme->scheme === 'bearer') {
@@ -34,12 +36,27 @@ class ScrambleServiceProvider extends ServiceProvider
         });
     }
 
+    private function applyConsultEndpointDocumentation(OpenApi $openApi): void
+    {
+        $description = app(ConsultQueryTypeDocumentation::class)->endpointDescription();
+
+        foreach ($openApi->paths as $path) {
+            if (! str_contains($path->path, 'consult/{queryType}')) {
+                continue;
+            }
+
+            if (isset($path->operations['post'])) {
+                $path->operations['post']->description = $description;
+            }
+        }
+    }
+
     private function introduction(): string
     {
         return <<<'MD'
 ## Visão geral
 
-A API do **Consulte Brasil** permite integrar consultas de dados oficiais do Brasil ao seu sistema. Cada consulta consome saldo da sua carteira conforme o tipo e o provedor utilizado.
+A API do **Consulte Brasil** permite integrar consultas de dados oficiais do Brasil ao seu sistema. Cada consulta consome saldo da sua carteira conforme o tipo escolhido.
 
 ## Autenticação
 
@@ -71,24 +88,22 @@ curl -X POST https://seu-dominio.com/api/v1/consult/cpf \
 {
   "data": {
     "consultation_id": "uuid",
-    "provider": "api_brasil",
-    "credits_charged": 1,
+    "amount_charged": 29,
+    "amount_charged_formatted": "R$ 0,29",
+    "credits_charged": 29,
+    "from_cache": false,
     "data": {
       "name": "JOAO DA SILVA",
-      "status": "REGULAR",
       "raw": {}
     }
   }
 }
 ```
 
-## Tipos de consulta (`queryType`)
+## Tipos de consulta
 
-| Tipo | Parâmetros em `params` | Descrição |
-|------|------------------------|-----------|
-| `cpf` | `document` (CPF, só números) | Dados cadastrais de pessoa física |
-| `cnpj` | `document` (CNPJ, só números) | Dados cadastrais de empresa |
-| `credito` | conforme provedor | Consultas de crédito |
+Consulte a tabela completa no endpoint **Executar consulta** (`POST /consult/{queryType}`).
+Os tipos listados refletem apenas rotas **ativas** no catálogo da plataforma.
 
 ## Erros comuns
 
@@ -104,7 +119,7 @@ curl -X POST https://seu-dominio.com/api/v1/consult/cpf \
 
 - **Rate limit:** 60 requisições por minuto por chave autenticada.
 - **Saldo:** debitado apenas em consultas concluídas com sucesso.
-- **Cache:** consultas idênticas podem retornar resposta recente com `from_cache: true`. O TTL é configurável por tipo (`query_types.cache_ttl_seconds`); expira automaticamente e é invalidado ao alterar provedor ou TTL do tipo.
+- **Cache:** consultas idênticas podem retornar resposta recente com `from_cache: true`. O TTL é configurável por tipo; expira automaticamente quando o tipo ou o cache são alterados na administração.
 MD;
     }
 }
