@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Src\Modules\Audit\Infrastructure\Http\Controllers\Client\RequestLogsClientController;
 use Src\Modules\Billing\Infrastructure\Http\Controllers\Client\ClientBillingController;
+use Src\Modules\Consultation\Infrastructure\Http\Controllers\Client\ConsultationsClientController;
 use Src\Modules\Identity\Infrastructure\Http\Controllers\Client\ApiKeysController;
 
 Route::middleware(['auth', 'verified'])
@@ -17,6 +18,12 @@ Route::middleware(['auth', 'verified'])
 
         // Logs das requisições da própria conta
         Route::get('/logs', [RequestLogsClientController::class, 'index'])->name('logs.index');
+
+        // Consultas via painel web (sessão)
+        Route::get('/consultations', [ConsultationsClientController::class, 'index'])->name('consultations.index');
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/consultations/{queryType}', [ConsultationsClientController::class, 'store'])->name('consultations.store');
+        });
 
         // Financeiro: carteira, recarga, faturas e assinatura
         Route::get('/billing', [ClientBillingController::class, 'index'])->name('billing.index');

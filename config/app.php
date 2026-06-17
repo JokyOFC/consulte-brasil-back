@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Marketing Site URL
+    |--------------------------------------------------------------------------
+    |
+    | Public website (e.g. consultebrasil.com.br). The app subdomain links
+    | back here from auth screens instead of the in-app welcome page.
+    |
+    */
+
+    'marketing_url' => env('MARKETING_SITE_URL', 'https://consultebrasil.com.br'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

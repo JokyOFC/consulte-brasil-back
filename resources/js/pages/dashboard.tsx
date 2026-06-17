@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Activity, ArrowUpRight, CreditCard, FileText, KeyRound, TrendingUp } from 'lucide-react';
+import { Activity, ArrowUpRight, CreditCard, FileSearch, FileText, KeyRound, TrendingUp } from 'lucide-react';
 import { ConsultationStatusBadge } from '@/components/consultation-status-badge';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
@@ -59,12 +59,17 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
                         <p className="text-sm text-muted-foreground">Resumo da sua conta e consumo.</p>
                     </div>
                     <div className="flex gap-2">
+                        <Button asChild>
+                            <Link href="/client/consultations">
+                                <FileSearch /> Nova consulta
+                            </Link>
+                        </Button>
                         <Button asChild variant="outline">
                             <Link href="/client/billing">
                                 <CreditCard /> Recarregar saldo
                             </Link>
                         </Button>
-                        <Button asChild>
+                        <Button asChild variant="outline">
                             <Link href="/client/api-keys">
                                 <KeyRound /> Gerenciar chaves
                             </Link>
@@ -113,9 +118,9 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
                     <CardHeader className="flex flex-row items-center justify-between border-b border-border py-4">
                         <CardTitle className="text-base">Consultas recentes</CardTitle>
                         <Button asChild variant="ghost" size="sm">
-                            <a href="/docs/api">
-                                Documentação <ArrowUpRight />
-                            </a>
+                            <Link href="/client/consultations">
+                                Ver consultas <ArrowUpRight />
+                            </Link>
                         </Button>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -146,8 +151,12 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
                                         <td colSpan={5} className="px-6 py-12 text-center">
                                             <FileText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
                                             <p className="text-sm text-muted-foreground">
-                                                Você ainda não fez consultas. Gere uma chave e siga a{' '}
-                                                <a href="/docs/api" className="text-brand-green hover:underline">documentação</a>.
+                                                Você ainda não fez consultas.{' '}
+                                                <Link href="/client/consultations" className="text-brand-green hover:underline">
+                                                    Realize sua primeira consulta
+                                                </Link>{' '}
+                                                ou integre via{' '}
+                                                <a href="/docs/api" className="text-brand-green hover:underline">API</a>.
                                             </p>
                                         </td>
                                     </tr>

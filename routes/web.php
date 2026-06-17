@@ -4,7 +4,6 @@ use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-// Raiz: sem landing de marketing — vai direto ao app.
 Route::get('/', function () {
     return Auth::check()
         ? redirect()->route('dashboard')

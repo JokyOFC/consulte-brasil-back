@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'marketingSiteUrl' => config('app.marketing_url'),
             'auth' => [
                 'user' => $request->user(),
                 // Minutos de inatividade até o logout automático (ajustável pelo

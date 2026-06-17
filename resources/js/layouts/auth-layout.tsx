@@ -1,8 +1,7 @@
-import { Link } from '@inertiajs/react';
-import { ShieldCheck, Zap } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { ChevronLeft, ShieldCheck, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BrandLogo, BrandMark } from '@/components/brand-logo';
-import { home } from '@/routes';
 
 /**
  * Layout branded de autenticação — painel esquerdo com o gradiente da
@@ -17,6 +16,8 @@ export default function AuthLayout({
     description?: string;
     children: ReactNode;
 }) {
+    const { marketingSiteUrl } = usePage<{ marketingSiteUrl: string }>().props;
+
     return (
         <div className="grid min-h-svh lg:grid-cols-2">
             {/* Painel da marca */}
@@ -30,10 +31,10 @@ export default function AuthLayout({
                     }}
                 />
 
-                <Link href={home()} className="relative z-10 flex items-center gap-3">
+                <a href={marketingSiteUrl} className="relative z-10 flex items-center gap-3">
                     <BrandMark className="size-10 drop-shadow" />
                     <span className="text-xl font-semibold tracking-tight">Consulte Brasil</span>
-                </Link>
+                </a>
 
                 <div className="relative z-10 space-y-8">
                     <div className="space-y-4">
@@ -72,9 +73,17 @@ export default function AuthLayout({
             {/* Formulário */}
             <div className="flex flex-col justify-center bg-background px-6 py-12 sm:px-12 lg:px-20">
                 <div className="mx-auto w-full max-w-[340px]">
-                    <Link href={home()} className="mb-10 flex lg:hidden">
+                    <a href={marketingSiteUrl} className="mb-10 flex lg:hidden">
                         <BrandLogo />
-                    </Link>
+                    </a>
+
+                    <a
+                        href={marketingSiteUrl}
+                        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        <ChevronLeft className="size-4" aria-hidden />
+                        Voltar ao site
+                    </a>
 
                     {(title || description) && (
                         <header className="mb-9 space-y-1.5">
