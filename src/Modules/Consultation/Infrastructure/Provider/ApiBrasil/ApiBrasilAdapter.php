@@ -65,6 +65,13 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
     {
         $runtime = $this->resolveRuntimeConfig($request->type);
 
+        if ($runtime['token'] === '') {
+            throw new ProviderUnavailable(
+                $this->identifier(),
+                'Token da API Brasil não configurado.',
+            );
+        }
+
         $startedAt = microtime(true);
         $response = $this->client->send(
             $runtime['method'],
@@ -80,7 +87,10 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
         // não encontrado, parâmetro inválido). Tratamos como falha do provedor
         // para acionar failover/estorno — o cliente nunca paga por "sem dado".
         if ($this->mapper->isError($response['body'])) {
-            throw new ProviderUnavailable($this->identifier());
+            throw new ProviderUnavailable(
+                $this->identifier(),
+                $this->mapper->errorMessage($response['body']),
+            );
         }
 
         return $this->mapper->toResult($request->type, $response['body'], [

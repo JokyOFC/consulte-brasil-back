@@ -12,8 +12,18 @@ use Src\Shared\Domain\Exception\DomainException;
  */
 final class AllProvidersFailed extends DomainException
 {
-    public static function forType(string $queryType): self
+    public function __construct(
+        string $message,
+        public readonly ?string $userMessage = null,
+    ) {
+        parent::__construct($message);
+    }
+
+    public static function forType(string $queryType, ?string $userMessage = null): self
     {
-        return new self("All providers failed for query type [{$queryType}].");
+        return new self(
+            "All providers failed for query type [{$queryType}].",
+            $userMessage,
+        );
     }
 }

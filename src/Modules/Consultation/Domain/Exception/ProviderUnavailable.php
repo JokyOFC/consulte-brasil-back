@@ -13,8 +13,15 @@ use Throwable;
  */
 final class ProviderUnavailable extends DomainException
 {
-    public function __construct(public readonly string $providerIdentifier, ?Throwable $previous = null)
-    {
-        parent::__construct("Provider [{$providerIdentifier}] is unavailable.", previous: $previous);
+    public function __construct(
+        public readonly string $providerIdentifier,
+        public readonly ?string $reason = null,
+        ?Throwable $previous = null,
+    ) {
+        $message = $reason !== null && $reason !== ''
+            ? "Provider [{$providerIdentifier}] is unavailable: {$reason}"
+            : "Provider [{$providerIdentifier}] is unavailable.";
+
+        parent::__construct($message, previous: $previous);
     }
 }

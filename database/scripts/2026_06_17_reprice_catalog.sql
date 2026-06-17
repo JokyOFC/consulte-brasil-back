@@ -1,0 +1,13 @@
+-- Reprecificação alinhada às planilhas de jun/2026.
+-- Preferível em produção: php artisan catalog:reprice --force
+-- (ou php artisan providers:sync-pricing --force — alias legado)
+--
+-- Este SQL é equivalente ao comando acima. Use apenas se não puder rodar Artisan.
+-- IMPORTANTE: faça backup antes de executar.
+
+-- Exemplo manual (cpf_analise_credito_basic):
+-- UPDATE query_types SET default_credit_cost = 1107, updated_at = NOW() WHERE code = 'cpf_analise_credito_basic';
+-- UPDATE provider_capabilities pc
+-- INNER JOIN providers p ON p.id = pc.provider_id
+-- SET pc.cost_cents = 1006, pc.price_cents = 1107, pc.updated_at = NOW()
+-- WHERE p.identifier = 'api_brasil' AND pc.query_type = 'cpf_analise_credito_basic';

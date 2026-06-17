@@ -47,8 +47,37 @@ final class ApiBrasilResponseMapper
             return true;
         }
 
+        if (is_string($body['error'] ?? null) && $body['error'] !== '' && $body['error'] !== 'false') {
+            return true;
+        }
+
+        $status = $body['status'] ?? null;
+        if ($status === false || $status === 'error' || $status === 'failed') {
+            return true;
+        }
+
         // Sem corpo útil também é tratado como falha (nada para entregar).
         return $body === [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    public function errorMessage(array $body): ?string
+    {
+        foreach (['message', 'error_message', 'detail'] as $key) {
+            $value = $body[$key] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        if (is_string($body['error'] ?? null) && $body['error'] !== '' && $body['error'] !== 'false') {
+            return $body['error'];
+        }
+
+        return null;
     }
 
     /**
@@ -60,10 +89,7 @@ final class ApiBrasilResponseMapper
         $map = self::FIELD_MAP[$type->code] ?? [];
 
         if ($map === []) {
-            // Sem mapa específico: passthrough do payload útil. A APIBrasil
-            // devolve o dado sob "response"/"data"; caímos no corpo inteiro
-            // como fallback. O bruto fica sempre sob "raw".
-            $payload = $body['response'] ?? $body['data'] ?? $body;
+            $payload = $this->extractPayload($body);
             $data = is_array($payload) ? $payload : ['result' => $payload];
             $data['raw'] = $body;
 
@@ -83,6 +109,40 @@ final class ApiBrasilResponseMapper
         $data['raw'] = $body;
 
         return $this->buildResult($data, $extraMeta);
+    }
+
+    /**
+     * Extrai o payload útil da APIBrasil e desembrulha envelopes de bureau
+     * (ex.: data.acertaEssencialPositivo.consultaCredito).
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>|mixed
+     */
+    private function extractPayload(array $body): mixed
+    {
+        $payload = $body['response'] ?? $body['data'] ?? $body;
+
+        if (! is_array($payload)) {
+            return $payload;
+        }
+
+        $resumoRetorno = $payload['resumoRetorno'] ?? null;
+
+        foreach ($payload as $value) {
+            if (! is_array($value) || ! isset($value['consultaCredito']) || ! is_array($value['consultaCredito'])) {
+                continue;
+            }
+
+            $unwrapped = $value['consultaCredito'];
+
+            if (is_array($resumoRetorno)) {
+                $unwrapped['resumoRetorno'] = $resumoRetorno;
+            }
+
+            return $unwrapped;
+        }
+
+        return $payload;
     }
 
     /**

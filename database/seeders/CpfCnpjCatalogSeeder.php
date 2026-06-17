@@ -44,7 +44,7 @@ final class CpfCnpjCatalogSeeder extends Seeder
         ['cpf_antecedentes', 'CPF — Mandados/Antecedentes', 'Mandados de busca e apreensão (BNMP) e lista INTERPOL.', '23', 1.46],
         ['cpf_situacao_simples', 'CPF — Situação simplificada', 'Nome, nascimento e situação cadastral.', '26', 0.37],
         ['cpf_cac', 'CPF — Antecedentes criminais (CAC/SINIC)', 'Certidão de antecedentes criminais (PF) em PDF.', '27', 0.27],
-        ['cpf_cns', 'CPF — Cartão Nacional de Saúde', 'CNS de 15 dígitos vinculado ao CPF.', '24', 0.24],
+        ['cpf_cns', 'CPF — Cartão Nacional de Saúde', 'CNS de 15 dígitos vinculado ao CPF.', '24', 0.25],
         ['cpf_risco', 'CPF — Score de risco', 'Nível e score de risco do CPF.', '13', 0.50],
 
         // ===== CNPJ =====

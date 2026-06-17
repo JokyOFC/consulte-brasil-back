@@ -82,12 +82,15 @@ final readonly class ApiBrasilHttpClient
                 $response = $pending->asJson()->send($method, $url, ['json' => $payload]);
             }
         } catch (ConnectionException $e) {
-            throw new ProviderUnavailable(self::PROVIDER_IDENTIFIER, $e);
+            throw new ProviderUnavailable(self::PROVIDER_IDENTIFIER, 'Falha de conexão com o provedor.', $e);
         }
 
         // Falhas de upstream/credencial → failover (e estorno do crédito).
         if ($this->shouldFailover($response)) {
-            throw new ProviderUnavailable(self::PROVIDER_IDENTIFIER);
+            throw new ProviderUnavailable(
+                self::PROVIDER_IDENTIFIER,
+                $this->extractErrorMessage($response),
+            );
         }
 
         return [
@@ -107,5 +110,24 @@ final readonly class ApiBrasilHttpClient
             || $status === 429
             || $status === 401
             || $status === 403;
+    }
+
+    private function extractErrorMessage(Response $response): ?string
+    {
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            return null;
+        }
+
+        foreach (['message', 'error_message', 'detail'] as $key) {
+            $value = $body[$key] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

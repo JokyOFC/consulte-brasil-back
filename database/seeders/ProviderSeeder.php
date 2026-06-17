@@ -71,11 +71,12 @@ final class ProviderSeeder extends Seeder
                     // Bearer da conta. Em produção, prefira o .env (API_BRASIL_TOKEN)
                     // ou sobrescreva aqui pelo painel admin.
                     'token' => (string) config('services.api_brasil.token', ''),
-                    // DeviceToken por serviço (fallback: config/.env). Vazio = usa .env.
-                    'device_tokens' => [
-                        'cpf' => (string) config('services.api_brasil.device_tokens.cpf', ''),
-                        'cnpj' => (string) config('services.api_brasil.device_tokens.cnpj', ''),
-                    ],
+                    'sandbox_token' => (string) config('services.api_brasil.sandbox_token', ''),
+                    // DeviceTokens por grupo/serviço (fallback: config/.env).
+                    'device_tokens' => array_filter(
+                        (array) config('services.api_brasil.device_tokens', []),
+                        static fn ($value) => $value !== null && $value !== '',
+                    ),
                 ],
             ));
         }

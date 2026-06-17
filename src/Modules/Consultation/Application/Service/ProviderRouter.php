@@ -44,6 +44,7 @@ final readonly class ProviderRouter
         }
 
         $attempted = 0;
+        $lastReason = null;
 
         foreach ($candidates as $descriptor) {
             if ($this->breaker->isOpen($descriptor->providerId, $request->type->code)) {
@@ -74,11 +75,12 @@ final readonly class ProviderRouter
 
                 return $result;
             } catch (ProviderUnavailable $e) {
+                $lastReason = $e->reason ?? $e->getMessage();
                 $this->breaker->recordFailure($descriptor->providerId, $request->type->code);
                 $this->logger->warning('provider.failover', [
                     'provider' => $descriptor->identifier,
                     'query_type' => $request->type->code,
-                    'reason' => $e->getMessage(),
+                    'reason' => $lastReason,
                     'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
                 ]);
             }
@@ -91,8 +93,29 @@ final readonly class ProviderRouter
         $this->logger->error('provider.all_failed', [
             'query_type' => $request->type->code,
             'attempted' => $attempted,
+            'reason' => $lastReason,
         ]);
 
-        throw AllProvidersFailed::forType($request->type->code);
+        throw AllProvidersFailed::forType(
+            $request->type->code,
+            $this->buildUserMessage($lastReason),
+        );
+    }
+
+    private function buildUserMessage(?string $reason): string
+    {
+        if ($reason === null || $reason === '') {
+            return 'Não foi possível concluir a consulta. Nenhum valor foi debitado.';
+        }
+
+        if (str_contains(mb_strtolower($reason), 'devicetoken') && str_contains(mb_strtolower($reason), 'não configurado')) {
+            return 'Não foi possível concluir a consulta: o DeviceToken da API Brasil não está configurado para este serviço. Nenhum valor foi debitado.';
+        }
+
+        if (str_contains(mb_strtolower($reason), 'token')) {
+            return "Não foi possível concluir a consulta: {$reason} Nenhum valor foi debitado.";
+        }
+
+        return "Não foi possível concluir a consulta: {$reason} Nenhum valor foi debitado.";
     }
 }

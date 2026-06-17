@@ -61,10 +61,14 @@ final class ConsultationsClientController
                 ->with('selected_query_type', $queryType);
         } catch (UnknownQueryType) {
             abort(404);
-        } catch (AllProvidersFailed|NoProviderAvailable) {
+        } catch (AllProvidersFailed|NoProviderAvailable $e) {
+            $message = $e instanceof AllProvidersFailed && $e->userMessage !== null
+                ? $e->userMessage
+                : 'Não foi possível concluir a consulta. Nenhum valor foi debitado.';
+
             return redirect()
                 ->route('client.consultations.index')
-                ->with('error', 'Não foi possível concluir a consulta. Nenhum valor foi debitado.')
+                ->with('error', $message)
                 ->with('selected_query_type', $queryType);
         }
 

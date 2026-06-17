@@ -31,7 +31,11 @@ final class ApiBrasilAdapterTest extends TestCase
             'token' => 'test-token',
             'timeout' => 5,
             'endpoints' => ['cpf' => 'v2/cpf', 'cnpj' => 'v2/cnpj'],
-            'device_tokens' => ['cpf' => 'device-cpf', 'cnpj' => 'device-cnpj'],
+            'device_tokens' => [
+                'cpf' => 'device-cpf',
+                'cnpj' => 'device-cnpj',
+                'cep' => 'device-cep',
+            ],
             'body_keys' => ['cpf' => 'cpf', 'cnpj' => 'cnpj'],
         ]);
     }
@@ -256,6 +260,85 @@ final class ApiBrasilAdapterTest extends TestCase
                 && $request['cpf'] === '11144477735'
                 && $request['tipo'] === 'spc-boa-vista'
                 && $request['homolog'] === true;
+        });
+    }
+
+    public function test_acerta_response_unwraps_consulta_credito_payload(): void
+    {
+        $providerId = $this->seedApiBrasilProvider(deviceGroup: 'cpf', deviceToken: '');
+
+        ProviderCapabilityModel::query()->create([
+            'id' => app(IdGenerator::class)->generate(),
+            'provider_id' => $providerId,
+            'query_type' => 'ab_cpf_acerta',
+            'priority' => 1,
+            'price_cents' => 1,
+            'enabled' => true,
+            'config' => [
+                'endpoint' => 'dados/cpf/credits',
+                'body_key' => 'cpf',
+                'device_group' => 'cpf',
+                'body' => ['tipo' => 'acerta-essencial'],
+                'homolog' => true,
+            ],
+        ]);
+
+        Http::fake([
+            'apibrasil.test/api/dados/cpf/credits' => Http::response([
+                'error' => false,
+                'message' => 'Dados validos!',
+                'data' => [
+                    'acertaEssencialPositivo' => [
+                        'consultaCredito' => [
+                            'dadosCadastrais' => [
+                                'nome' => 'JOAO DA SILVA',
+                                'cpf' => '3953375504',
+                            ],
+                            'score' => [
+                                'score' => 533,
+                                'mensagem' => 'Bom pagador',
+                            ],
+                        ],
+                    ],
+                    'resumoRetorno' => [
+                        'protocolo' => '8744a2782b43492',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $result = app(ApiBrasilAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('ab_cpf_acerta'), ['document' => '03953375504']),
+        );
+
+        $this->assertSame('JOAO DA SILVA', $result->data['dadosCadastrais']['nome']);
+        $this->assertSame(533, $result->data['score']['score']);
+        $this->assertSame('8744a2782b43492', $result->data['resumoRetorno']['protocolo']);
+    }
+
+    public function test_it_works_without_device_token_when_not_configured(): void
+    {
+        config()->set('services.api_brasil.device_tokens', [
+            'cpf' => '',
+            'cnpj' => '',
+        ]);
+
+        $this->seedApiBrasilProvider(deviceGroup: 'cpf', deviceToken: '');
+
+        Http::fake([
+            'apibrasil.test/api/v2/cpf' => Http::response([
+                'response' => ['nome' => 'JOÃO DA SILVA'],
+            ], 200),
+        ]);
+
+        $result = app(ApiBrasilAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+        );
+
+        $this->assertSame('JOÃO DA SILVA', $result->data['name']);
+
+        Http::assertSent(function ($request) {
+            return ! $request->hasHeader('DeviceToken');
         });
     }
 
