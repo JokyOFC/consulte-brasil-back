@@ -75,15 +75,15 @@ final class ConsultationsClientController
         return redirect()
             ->route('client.consultations.index')
             ->with([
-            'success' => 'Consulta realizada com sucesso.',
-            'selected_query_type' => $queryType,
-            'consultation_result' => [
-                'consultation_id' => $output->consultationId,
-                'query_type' => $queryType,
-                'amount_charged' => $output->creditsCharged,
-                'from_cache' => $output->fromCache,
-                'data' => $output->data,
-            ],
-        ]);
+                'success' => 'Consulta realizada com sucesso.',
+                'selected_query_type' => $queryType,
+                'consultation_result' => [
+                    'consultation_id' => $output->consultationId,
+                    'query_type' => $queryType,
+                    'amount_charged' => $output->creditsCharged,
+                    'from_cache' => $output->fromCache,
+                    'data' => $output->data,
+                ],
+            ]);
     }
 }

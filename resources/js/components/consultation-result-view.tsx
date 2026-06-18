@@ -1,7 +1,9 @@
 import { Building2, ChevronDown, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { ConsultationAttachmentsPanel } from '@/components/consultation-attachments-panel';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { findPdfAttachments, sanitizeResultForDisplay } from '@/lib/consultation-attachments';
 import {
     formatResultPrimitive,
     getScoreDescription,
@@ -17,9 +19,11 @@ import {
 import { cn } from '@/lib/utils';
 
 export function ConsultationResultView({ data }: { data: Record<string, unknown> }) {
-    const entries = sortResultEntries(Object.entries(data));
+    const attachments = useMemo(() => findPdfAttachments(data), [data]);
+    const sanitized = useMemo(() => sanitizeResultForDisplay(data), [data]);
+    const entries = sortResultEntries(Object.entries(sanitized));
 
-    if (entries.length === 0) {
+    if (entries.length === 0 && attachments.length === 0) {
         return (
             <div className="px-6 py-8 text-center text-sm text-muted-foreground">
                 Nenhum dado estruturado disponível.
@@ -31,20 +35,26 @@ export function ConsultationResultView({ data }: { data: Record<string, unknown>
 
     if (allPrimitive) {
         return (
-            <div className="grid gap-px bg-border/60 sm:grid-cols-2">
-                {entries.map(([key, value]) => (
-                    <FieldCell key={key} label={humanizeFieldKey(key)} value={formatResultPrimitive(value)} />
-                ))}
-            </div>
+            <>
+                <ConsultationAttachmentsPanel attachments={attachments} />
+                <div className="grid gap-px bg-border/60 sm:grid-cols-2">
+                    {entries.map(([key, value]) => (
+                        <FieldCell key={key} label={humanizeFieldKey(key)} value={formatResultPrimitive(value)} />
+                    ))}
+                </div>
+            </>
         );
     }
 
     return (
-        <div className="space-y-3 p-4 md:p-5">
-            {entries.map(([key, value], index) => (
-                <ResultSection key={key} title={humanizeFieldKey(key)} value={value} defaultOpen={index < 2} />
-            ))}
-        </div>
+        <>
+            <ConsultationAttachmentsPanel attachments={attachments} />
+            <div className="space-y-3 p-4 md:p-5">
+                {entries.map(([key, value], index) => (
+                    <ResultSection key={key} title={humanizeFieldKey(key)} value={value} defaultOpen={index < 2} />
+                ))}
+            </div>
+        </>
     );
 }
 
@@ -58,6 +68,14 @@ function ResultSection({
     defaultOpen?: boolean;
 }) {
     if (isPrimitive(value)) {
+        if (title.toLowerCase().includes('nada consta') && typeof value === 'boolean') {
+            return (
+                <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+                    <NadaConstaField label={title} value={value} inline />
+                </div>
+            );
+        }
+
         return (
             <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
                 <FieldCell label={title} value={formatResultPrimitive(value)} inline />
@@ -162,6 +180,10 @@ function ObjectTree({ data, depth }: { data: Record<string, unknown>; depth: num
 
 function ResultNode({ label, value, depth }: { label: string; value: unknown; depth: number }) {
     if (isPrimitive(value)) {
+        if (label.toLowerCase().includes('nada consta') && typeof value === 'boolean') {
+            return <NadaConstaField label={label} value={value} />;
+        }
+
         return <FieldCell label={label} value={formatResultPrimitive(value)} inline />;
     }
 
@@ -214,7 +236,7 @@ function ResultNode({ label, value, depth }: { label: string; value: unknown; de
             <details className="rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
                 <summary className="cursor-pointer text-sm font-medium">{label}</summary>
                 <pre className="mt-2 max-h-48 overflow-auto text-xs text-muted-foreground">
-                    {JSON.stringify(value, null, 2)}
+                    {JSON.stringify(sanitizeResultForDisplay(value), null, 2)}
                 </pre>
             </details>
         );
@@ -244,7 +266,11 @@ function ArrayValue({ value }: { value: unknown[] }) {
         if (columns.length === 0) {
             return (
                 <pre className="max-h-48 overflow-auto rounded-lg bg-muted/30 p-3 text-xs">
-                    {JSON.stringify(value, null, 2)}
+                    {JSON.stringify(
+                        value.map((item) => (isPlainObject(item) ? sanitizeResultForDisplay(item) : item)),
+                        null,
+                        2,
+                    )}
                 </pre>
             );
         }
@@ -364,6 +390,35 @@ function ScoreCard({ data, compact = false }: { data: Record<string, unknown>; c
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+function NadaConstaField({
+    label,
+    value,
+    inline = false,
+}: {
+    label: string;
+    value: boolean;
+    inline?: boolean;
+}) {
+    const positive = value;
+
+    return (
+        <div className={cn(!inline && 'rounded-lg bg-muted/20 px-3 py-2.5')}>
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+            <div className="mt-2">
+                <Badge
+                    variant={positive ? 'default' : 'destructive'}
+                    className={cn(
+                        'text-sm font-semibold',
+                        positive && 'bg-brand-green hover:bg-brand-green/90',
+                    )}
+                >
+                    {positive ? 'NADA CONSTA' : 'CONSTAM REGISTROS'}
+                </Badge>
+            </div>
         </div>
     );
 }

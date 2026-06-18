@@ -16,11 +16,13 @@ use Src\Modules\Consultation\Domain\Port\QueryTypeCatalog;
 use Src\Modules\Consultation\Domain\Repository\ConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Cache\CacheConsultationResultCache;
 use Src\Modules\Consultation\Infrastructure\Console\PurgeConsultationRequestHashCommand;
+use Src\Modules\Consultation\Infrastructure\Console\RefreshCachedPdfResultsCommand;
+use Src\Modules\Consultation\Infrastructure\Enrichment\CachedConsultationResultEnricher;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentQueryTypeCatalog;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\QueryTypeModel;
-use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\ProviderCapabilityCacheObserver;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\ProviderCacheObserver;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\ProviderCapabilityCacheObserver;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Observers\QueryTypeCacheObserver;
 use Src\Modules\Consultation\Infrastructure\Provider\ApiBrasil\ApiBrasilAdapter;
 use Src\Modules\Consultation\Infrastructure\Provider\ApiBrasil\ApiBrasilHttpClient;
@@ -103,6 +105,8 @@ final class ConsultationServiceProvider extends ServiceProvider
                 cache: $app->make('cache')->store(),
             );
         });
+
+        $this->app->singleton(CachedConsultationResultEnricher::class);
     }
 
     public function boot(): void
@@ -114,7 +118,10 @@ final class ConsultationServiceProvider extends ServiceProvider
         ProviderCapabilityModel::observe(ProviderCapabilityCacheObserver::class);
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PurgeConsultationRequestHashCommand::class]);
+            $this->commands([
+                PurgeConsultationRequestHashCommand::class,
+                RefreshCachedPdfResultsCommand::class,
+            ]);
         }
     }
 }

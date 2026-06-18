@@ -8,6 +8,9 @@ use Illuminate\Support\Arr;
 use Src\Modules\Consultation\Domain\ValueObject\ConsultationResult;
 use Src\Modules\Consultation\Domain\ValueObject\ProviderMetadata;
 use Src\Modules\Consultation\Domain\ValueObject\QueryType;
+use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\Support\CertificateTextParser;
+use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\Support\EmbeddedPdfEnricher;
+use Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj\Support\EmbeddedPdfTextExtractor;
 
 /**
  * Traduz o payload bruto da API CPF.CNPJ para o ConsultationResult
@@ -17,6 +20,16 @@ use Src\Modules\Consultation\Domain\ValueObject\QueryType;
  */
 final class CpfCnpjResponseMapper
 {
+    private EmbeddedPdfEnricher $pdfEnricher;
+
+    public function __construct(?EmbeddedPdfEnricher $pdfEnricher = null)
+    {
+        $this->pdfEnricher = $pdfEnricher ?? new EmbeddedPdfEnricher(
+            new EmbeddedPdfTextExtractor,
+            new CertificateTextParser,
+        );
+    }
+
     /** @var array<string, array<string, string>> */
     private const FIELD_MAP = [
         'cpf' => [
@@ -84,9 +97,10 @@ final class CpfCnpjResponseMapper
             }
         } else {
             // Demais pacotes: passthrough de todos os campos do provedor.
-            $data = $clean;
+            $data = json_decode(json_encode($clean, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
         }
 
+        $data = $this->pdfEnricher->enrich($data);
         $data['raw'] = $clean;
 
         return new ConsultationResult(

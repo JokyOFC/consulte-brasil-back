@@ -1,3 +1,5 @@
+import { isBase64PdfValue } from '@/lib/consultation-attachments';
+
 const FIELD_LABELS: Record<string, string> = {
     name: 'Nome',
     birth_date: 'Data de nascimento',
@@ -40,6 +42,18 @@ const FIELD_LABELS: Record<string, string> = {
     protocolo: 'Protocolo',
     tempoExecucao: 'Tempo de execução',
     codigoConsulta: 'Código da consulta',
+    cac: 'Antecedentes criminais (CAC)',
+    certificado: 'Dados do certificado',
+    conclusao: 'Conclusão',
+    titulo: 'Título',
+    tipo: 'Tipo do documento',
+    dataEmissao: 'Data de emissão',
+    validade: 'Validade',
+    orgaoEmissor: 'Órgão emissor',
+    textoResumo: 'Resumo do documento',
+    nrProtocolo: 'Número do protocolo',
+    nadaConsta: 'Nada consta',
+    comprovantePdfBase64: 'Comprovante PDF',
     cliente: 'Cliente',
     razaoSocial: 'Razão social',
     nomeFantasia: 'Nome fantasia',
@@ -60,9 +74,11 @@ const SECTION_PRIORITY: Record<string, number> = {
     resumoretono: 0,
     resumoretorno: 0,
     resumoRetorno: 0,
-    dadoscadastrais: 1,
-    dadosCadastrais: 1,
-    score: 2,
+    cac: 1,
+    certificado: 2,
+    dadoscadastrais: 3,
+    dadosCadastrais: 3,
+    score: 4,
 };
 
 export function splitConsultationResult(data: Record<string, unknown>): {
@@ -111,8 +127,12 @@ export function formatResultPrimitive(value: unknown): string {
 
     const text = String(value).trim();
 
+    if (isBase64PdfValue(text)) {
+        return 'Documento PDF anexo — use os botões acima para baixar ou visualizar';
+    }
+
     if (text.length > 400) {
-        return text;
+        return `${text.slice(0, 400)}…`;
     }
 
     return text;

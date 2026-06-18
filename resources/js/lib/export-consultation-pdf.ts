@@ -1,3 +1,4 @@
+import { sanitizeResultForDisplay } from '@/lib/consultation-attachments';
 import type { jsPDF } from 'jspdf';
 import {
     formatResultPrimitive,
@@ -495,7 +496,7 @@ export async function exportConsultationPdf(input: ExportConsultationPdfInput): 
     autoTableModule.applyPlugin(jsPDF);
 
     const { display } = splitConsultationResult(input.data);
-    const blocks = buildBlocks(display);
+    const blocks = buildBlocks(sanitizeResultForDisplay(display));
     const generatedAt = new Date().toLocaleString('pt-BR');
 
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });

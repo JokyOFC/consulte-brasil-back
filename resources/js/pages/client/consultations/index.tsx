@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/sheet';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { splitConsultationResult } from '@/lib/consultation-result';
+import { downloadBase64Pdf, findPdfAttachments, sanitizeResultForDisplay } from '@/lib/consultation-attachments';
 import { exportConsultationPdf } from '@/lib/export-consultation-pdf';
 import { formatBRL, formatDocument } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -543,7 +544,8 @@ function ConsultationResultPanel({
     result: ConsultationResult;
     queryType: QueryTypeRow;
 }) {
-    const { display, raw } = splitConsultationResult(result.data);
+    const { display } = splitConsultationResult(result.data);
+    const pdfAttachments = useMemo(() => findPdfAttachments(result.data), [result.data]);
     const [copied, setCopied] = useState(false);
     const [exporting, setExporting] = useState(false);
 
@@ -553,7 +555,20 @@ function ConsultationResultPanel({
         window.setTimeout(() => setCopied(false), 2000);
     }
 
-    async function handleExportPdf() {
+    function handleDownloadCertificate() {
+        const attachment = pdfAttachments[0];
+
+        if (!attachment) {
+            return;
+        }
+
+        downloadBase64Pdf(
+            attachment.base64,
+            `consulta-${queryType.code}-${result.consultation_id.slice(0, 8)}.pdf`,
+        );
+    }
+
+    async function handleExportSummaryPdf() {
         setExporting(true);
         try {
             await exportConsultationPdf({
@@ -585,9 +600,20 @@ function ConsultationResultPanel({
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="default" size="sm" disabled={exporting} onClick={() => void handleExportPdf()}>
+                    {pdfAttachments.length > 0 && (
+                        <Button variant="default" size="sm" onClick={handleDownloadCertificate}>
+                            <FileDown className="size-4" />
+                            Baixar certificado PDF
+                        </Button>
+                    )}
+                    <Button
+                        variant={pdfAttachments.length > 0 ? 'outline' : 'default'}
+                        size="sm"
+                        disabled={exporting}
+                        onClick={() => void handleExportSummaryPdf()}
+                    >
                         {exporting ? <Loader2 className="animate-spin" /> : <FileDown className="size-4" />}
-                        {exporting ? 'Gerando PDF…' : 'Exportar PDF'}
+                        {exporting ? 'Gerando PDF…' : pdfAttachments.length > 0 ? 'Exportar resumo' : 'Exportar PDF'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => void copyConsultationId()}>
                         <ClipboardCopy className="size-4" />
@@ -599,16 +625,14 @@ function ConsultationResultPanel({
             <CardContent className="space-y-4 p-0">
                 <ConsultationResultView data={display} />
 
-                {raw !== undefined && (
-                    <details className="border-t border-border/60 px-5 py-4 md:px-6">
-                        <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-                            Resposta completa (JSON)
-                        </summary>
-                        <pre className="mt-3 max-h-80 overflow-auto rounded-xl border border-border/60 bg-muted/40 p-4 text-xs leading-relaxed">
-                            {JSON.stringify(raw, null, 2)}
-                        </pre>
-                    </details>
-                )}
+                <details className="border-t border-border/60 px-5 py-4 md:px-6">
+                    <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                        Resposta completa (JSON)
+                    </summary>
+                    <pre className="mt-3 max-h-80 overflow-auto rounded-xl border border-border/60 bg-muted/40 p-4 text-xs leading-relaxed">
+                        {JSON.stringify(sanitizeResultForDisplay(display), null, 2)}
+                    </pre>
+                </details>
 
                 <p className="border-t border-border/60 px-5 py-3 text-xs text-muted-foreground md:px-6">
                     ID <code className="rounded bg-muted px-1 py-0.5">{result.consultation_id}</code>

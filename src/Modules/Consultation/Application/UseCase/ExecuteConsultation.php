@@ -20,6 +20,7 @@ use Src\Modules\Consultation\Domain\Port\QueryTypeCatalog;
 use Src\Modules\Consultation\Domain\Repository\ConsultationRepository;
 use Src\Modules\Consultation\Domain\ValueObject\ConsultationRequest;
 use Src\Modules\Consultation\Domain\ValueObject\QueryType;
+use Src\Modules\Consultation\Infrastructure\Enrichment\CachedConsultationResultEnricher;
 use Src\Modules\Provider\Domain\Port\ProviderRegistry;
 use Src\Modules\Provider\Domain\Repository\ProviderRepository;
 use Src\Shared\Application\Contracts\Clock;
@@ -48,6 +49,7 @@ final readonly class ExecuteConsultation
         private ConsultationRepository $consultations,
         private ProviderRepository $providers,
         private ProviderRegistry $registry,
+        private CachedConsultationResultEnricher $cachedResultEnricher,
         private IdGenerator $ids,
         private Clock $clock,
     ) {}
@@ -104,6 +106,10 @@ final readonly class ExecuteConsultation
                 reservationId: $reservation->reservationId,
                 cached: $cached,
                 creditCost: $creditCost,
+                cacheScope: $cacheScope,
+                queryType: $type->code,
+                fingerprint: $fingerprint,
+                cacheTtl: $cacheTtl,
             );
         }
 
@@ -152,7 +158,27 @@ final readonly class ExecuteConsultation
         string $reservationId,
         CachedConsultationResult $cached,
         int $creditCost,
+        string $cacheScope,
+        string $queryType,
+        string $fingerprint,
+        int $cacheTtl,
     ): ExecuteConsultationOutput {
+        $data = $this->cachedResultEnricher->enrich($cached->providerIdentifier, $cached->data);
+
+        if ($data !== $cached->data && $cacheTtl > 0) {
+            $this->resultCache->put(
+                scope: $cacheScope,
+                queryType: $queryType,
+                fingerprint: $fingerprint,
+                result: new CachedConsultationResult(
+                    providerIdentifier: $cached->providerIdentifier,
+                    data: $data,
+                    httpStatus: $cached->httpStatus,
+                ),
+                ttlSeconds: $cacheTtl,
+            );
+        }
+
         $providerEntity = $this->providers->findByIdentifier($cached->providerIdentifier);
         $consultation->markSuccess($providerEntity?->id, 0, $cached->httpStatus);
 
@@ -162,7 +188,7 @@ final readonly class ExecuteConsultation
         return new ExecuteConsultationOutput(
             consultationId: $consultation->id,
             providerIdentifier: $cached->providerIdentifier,
-            data: $cached->data,
+            data: $data,
             creditsCharged: $creditCost,
             fromCache: true,
         );
