@@ -136,24 +136,27 @@ export function isScoreObject(value: unknown): value is Record<string, unknown> 
         return false;
     }
 
-    return typeof value.score === 'number' || typeof value.pontuacao === 'number';
+    return getScoreValue(value) !== null;
 }
 
 export function getScoreValue(value: Record<string, unknown>): number | null {
-    if (typeof value.score === 'number') {
-        return value.score;
-    }
+    for (const [key, candidate] of Object.entries(value)) {
+        const normalized = key.toLowerCase();
 
-    if (typeof value.pontuacao === 'number') {
-        return value.pontuacao;
+        if ((normalized === 'score' || normalized === 'pontuacao') && typeof candidate === 'number') {
+            return candidate;
+        }
     }
 
     return null;
 }
 
 export function getScoreDescription(value: Record<string, unknown>): string | null {
-    for (const key of ['texto', 'mensagem', 'descricao', 'message']) {
-        const candidate = value[key];
+    for (const [key, candidate] of Object.entries(value)) {
+        if (!['texto', 'mensagem', 'descricao', 'message'].includes(key.toLowerCase())) {
+            continue;
+        }
+
         if (typeof candidate === 'string' && candidate.trim() !== '') {
             return candidate.trim();
         }
