@@ -20,4 +20,30 @@ return [
         'cnpj' => 604800,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | OCR de fallback para PDFs sem camada de texto
+    |--------------------------------------------------------------------------
+    |
+    | Algumas certidões (ex.: antecedentes criminais da PF) chegam como PDF
+    | escaneado/imagem, sem texto extraível. Quando o Smalot não acha texto,
+    | o sistema tenta OCR LOCAL (Ghostscript rasteriza → Tesseract reconhece),
+    | mantendo dados sensíveis no servidor. Se os binários não existirem, o
+    | OCR vira no-op e a consulta segue normalmente.
+    |
+    | Requisitos no servidor: ghostscript (gs/gswin64c) e tesseract-ocr com o
+    | idioma português (traineddata `por`).
+    |
+    */
+    'ocr' => [
+        'enabled' => (bool) env('CONSULTATION_OCR_ENABLED', true),
+        'language' => env('CONSULTATION_OCR_LANG', 'por'),
+        'dpi' => (int) env('CONSULTATION_OCR_DPI', 300),
+        'max_pages' => (int) env('CONSULTATION_OCR_MAX_PAGES', 3),
+        'timeout_seconds' => (int) env('CONSULTATION_OCR_TIMEOUT', 60),
+        // Caminhos explícitos (opcional). Se null, são descobertos no PATH.
+        'ghostscript_bin' => env('CONSULTATION_OCR_GHOSTSCRIPT_BIN'),
+        'tesseract_bin' => env('CONSULTATION_OCR_TESSERACT_BIN'),
+    ],
+
 ];
