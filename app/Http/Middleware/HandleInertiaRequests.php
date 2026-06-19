@@ -54,6 +54,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'plain_token' => fn () => $request->session()->get('plain_token'),
+                'plain_secret' => fn () => $request->session()->get('plain_secret'),
                 'payment' => fn () => $request->session()->get('payment'),
             ],
             'adminShell' => fn () => $request->user()?->role === 'admin'

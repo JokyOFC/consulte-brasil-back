@@ -1,7 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Check, Copy, RefreshCw, Webhook } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, RefreshCw, Webhook } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,15 +11,20 @@ import { usePageFlash } from '@/hooks/use-page-flash';
 
 interface PageProps {
     webhook_url: string | null;
+    webhook_secret: string | null;
     webhook_configured: boolean;
-    flash?: { plain_secret?: string };
+    account_missing?: boolean;
     [key: string]: unknown;
 }
 
 export default function ClientWebhookIndex() {
     usePageFlash();
-    const { webhook_url, webhook_configured, flash } = usePage<PageProps>().props;
+    const { webhook_url, webhook_secret, webhook_configured, account_missing } = usePage<PageProps>().props;
     const form = useForm({ webhook_url: webhook_url ?? '' });
+
+    useEffect(() => {
+        form.setData('webhook_url', webhook_url ?? '');
+    }, [webhook_url]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -51,7 +56,14 @@ export default function ClientWebhookIndex() {
                     description="Receba notificações POST quando uma consulta for concluída (sucesso ou falha com reembolso)."
                 />
 
-                {flash?.plain_secret && <SecretReveal secret={flash.plain_secret} />}
+                {account_missing && (
+                    <Card className="gap-0 border-destructive/40 bg-destructive/5 py-0">
+                        <CardContent className="p-5 text-sm text-muted-foreground">
+                            Sua conta de usuário não está vinculada a um cliente. Entre com um usuário de cliente ou
+                            cadastre uma conta pelo fluxo de registro.
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
@@ -59,7 +71,8 @@ export default function ClientWebhookIndex() {
                             <Webhook className="size-4" /> Configuração
                         </CardTitle>
                         <CardDescription>
-                            Opcional. Sem URL configurada, nenhuma notificação é enviada e a API continua respondendo normalmente.
+                            Opcional. Sem URL configurada, nenhuma notificação é enviada e a API continua respondendo
+                            normalmente. Ao salvar uma URL pela primeira vez, o secret é gerado automaticamente.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -72,14 +85,26 @@ export default function ClientWebhookIndex() {
                                     value={form.data.webhook_url}
                                     onChange={(e) => form.setData('webhook_url', e.target.value)}
                                     placeholder="https://seu-sistema.com/webhooks/consulte"
+                                    disabled={account_missing}
                                 />
                                 {form.errors.webhook_url && (
                                     <p className="text-sm text-destructive">{form.errors.webhook_url}</p>
                                 )}
                             </div>
 
+                            {webhook_secret && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="webhook-secret">Secret (HMAC)</Label>
+                                    <SecretField secret={webhook_secret} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Use este valor para validar o header <code>X-Consulte-Signature</code> nos POSTs
+                                        recebidos.
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="flex flex-wrap gap-2">
-                                <Button type="submit" disabled={form.processing}>
+                                <Button type="submit" disabled={form.processing || account_missing}>
                                     Salvar
                                 </Button>
                                 {webhook_configured && (
@@ -87,7 +112,12 @@ export default function ClientWebhookIndex() {
                                         <Button type="button" variant="outline" onClick={regenerate}>
                                             <RefreshCw /> Regenerar secret
                                         </Button>
-                                        <Button type="button" variant="ghost" className="text-destructive" onClick={remove}>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="text-destructive"
+                                            onClick={remove}
+                                        >
                                             Remover
                                         </Button>
                                     </>
@@ -103,8 +133,8 @@ export default function ClientWebhookIndex() {
                         <CardDescription>
                             Cada POST inclui o header <code className="text-xs">X-Consulte-Signature</code> no formato{' '}
                             <code className="text-xs">t=&#123;unix&#125;,v1=&#123;hmac&#125;</code>.
-                            O conteúdo assinado é <code className="text-xs">&#123;timestamp&#125;.&#123;corpo_json&#125;</code> com HMAC-SHA256.
-                            Rejeite timestamps com mais de 5 minutos de diferença.
+                            O conteúdo assinado é <code className="text-xs">&#123;timestamp&#125;.&#123;corpo_json&#125;</code>{' '}
+                            com HMAC-SHA256. Rejeite timestamps com mais de 5 minutos de diferença.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="text-sm text-muted-foreground">
@@ -120,8 +150,9 @@ export default function ClientWebhookIndex() {
     );
 }
 
-function SecretReveal({ secret }: { secret: string }) {
+function SecretField({ secret }: { secret: string }) {
     const [copied, setCopied] = useState(false);
+    const [visible, setVisible] = useState(true);
 
     const copy = async () => {
         try {
@@ -134,22 +165,22 @@ function SecretReveal({ secret }: { secret: string }) {
     };
 
     return (
-        <Card className="gap-0 border-brand-green/40 bg-brand-green/5 py-0">
-            <CardContent className="space-y-3 p-5">
-                <div className="flex items-center gap-2 text-sm font-medium text-brand-green">
-                    <Webhook className="size-4" /> Secret gerado — copie agora, não exibiremos novamente.
-                </div>
-                <div className="flex items-center gap-2">
-                    <code className="flex-1 overflow-x-auto rounded-md border border-border bg-background px-3 py-2 font-mono text-xs">
-                        {secret}
-                    </code>
-                    <Button variant="outline" size="sm" onClick={copy}>
-                        {copied ? <Check className="text-brand-green" /> : <Copy />}
-                        {copied ? 'Copiado' : 'Copiar'}
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+        <div className="flex items-center gap-2">
+            <Input
+                id="webhook-secret"
+                readOnly
+                type={visible ? 'text' : 'password'}
+                value={secret}
+                className="font-mono text-xs"
+            />
+            <Button type="button" variant="outline" size="icon" onClick={() => setVisible((v) => !v)}>
+                {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={copy}>
+                {copied ? <Check className="text-brand-green" /> : <Copy className="size-4" />}
+                {copied ? 'Copiado' : 'Copiar'}
+            </Button>
+        </div>
     );
 }
 

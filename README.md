@@ -77,6 +77,8 @@ database/             # Migrations e seeders
 
 Com a aplicação rodando, a documentação interativa (Scalar) fica disponível em `/docs/api`.
 
+- [Webhook de consultas](docs/webhook.md) — notificações de saída, payload, assinatura HMAC e configuração
+
 ## Licença
 
 MIT
