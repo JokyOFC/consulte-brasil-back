@@ -28,6 +28,8 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
      * @param  array<string, string>  $bodyKeys  queryType => chave do body p/ "document"
      * @param  array<string, string>  $methods  queryType => método HTTP (GET/POST)
      * @param  array<string, array<string, mixed>>  $bodies  queryType => body estático (ex.: tipo)
+     * @param  array<string, int>  $timeouts  queryType => timeout (segundos) específico
+     * @param  int  $creditTimeoutSeconds  timeout p/ endpoints de crédito (.../credits); 0 = desliga a heurística
      */
     public function __construct(
         private ApiBrasilHttpClient $client,
@@ -41,6 +43,8 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
         private array $bodyKeys = [],
         private array $methods = [],
         private array $bodies = [],
+        private array $timeouts = [],
+        private int $creditTimeoutSeconds = 0,
     ) {}
 
     public function identifier(): string
@@ -69,6 +73,7 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
             throw new ProviderUnavailable(
                 $this->identifier(),
                 'Token da API Brasil não configurado.',
+                transient: false,
             );
         }
 
@@ -80,16 +85,23 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
             $runtime['base_url'],
             $runtime['token'],
             $runtime['device_token'],
+            $runtime['timeout'],
         );
         $latency = (int) round((microtime(true) - $startedAt) * 1000);
 
-        // A APIBrasil pode responder 2xx com um envelope de erro (documento
-        // não encontrado, parâmetro inválido). Tratamos como falha do provedor
-        // para acionar failover/estorno — o cliente nunca paga por "sem dado".
+        // A APIBrasil pode responder 2xx/4xx com um envelope de erro (documento
+        // não encontrado, "consulta não concluída", parâmetro inválido). É
+        // falha de NEGÓCIO, não outage: aciona estorno (o cliente nunca paga
+        // por "sem dado"), mas NÃO abre o circuito (transient: false).
         if ($this->mapper->isError($response['body'])) {
             throw new ProviderUnavailable(
                 $this->identifier(),
                 $this->mapper->errorMessage($response['body']),
+                transient: false,
+                context: [
+                    'http_status' => $response['status'],
+                    'body' => $response['body'],
+                ],
             );
         }
 
@@ -134,7 +146,7 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
      *  - endpoint/body_key: capability config (banco) → config/services.php
      *  - device_token: credenciais do provider (cifradas) → config/.env
      *
-     * @return array{base_url: string, token: string, endpoint: string, body_key: ?string, device_token: ?string, method: string, static_body: array<string, mixed>, homolog: bool}
+     * @return array{base_url: string, token: string, endpoint: string, body_key: ?string, device_token: ?string, method: string, static_body: array<string, mixed>, homolog: bool, timeout: ?int}
      */
     private function resolveRuntimeConfig(QueryType $type): array
     {
@@ -190,7 +202,37 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
             'method' => strtoupper($method),
             'static_body' => $staticBody,
             'homolog' => $homolog,
+            'timeout' => $this->resolveTimeout($capability, $type, $endpoint),
         ];
+    }
+
+    /**
+     * Timeout (segundos) para a chamada, na ordem de precedência:
+     *  1. capability "timeout" (admin, por provedor+tipo);
+     *  2. config services.api_brasil.timeouts[tipo];
+     *  3. heurística: endpoints de crédito (.../credits) agregam bureaus e são
+     *     lentos → usa o credit_timeout;
+     *  4. null → o ApiBrasilHttpClient aplica o timeout global padrão.
+     *
+     * @param  array<string, mixed>  $capability
+     */
+    private function resolveTimeout(array $capability, QueryType $type, string $endpoint): ?int
+    {
+        $capabilityTimeout = isset($capability['timeout']) ? (int) $capability['timeout'] : 0;
+        if ($capabilityTimeout > 0) {
+            return $capabilityTimeout;
+        }
+
+        $perType = (int) ($this->timeouts[$type->code] ?? 0);
+        if ($perType > 0) {
+            return $perType;
+        }
+
+        if ($this->creditTimeoutSeconds > 0 && str_contains(strtolower($endpoint), 'credits')) {
+            return $this->creditTimeoutSeconds;
+        }
+
+        return null;
     }
 
     /**

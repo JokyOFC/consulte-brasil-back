@@ -66,11 +66,19 @@ final readonly class CpfCnpjAdapter implements DataProviderPort
         );
         $latency = (int) round((microtime(true) - $startedAt) * 1000);
 
-        // Falha de negócio (erro/erroCodigo ou status != 1) → trata como
-        // indisponibilidade para acionar failover/estorno. O cliente nunca
-        // paga por "documento não encontrado", token/saldo inválido, etc.
+        // Falha de negócio (erro/erroCodigo ou status != 1) → aciona estorno
+        // (o cliente nunca paga por "documento não encontrado", saldo inválido,
+        // etc.), mas NÃO abre o circuito: o provedor está saudável, é só esta
+        // requisição que não rendeu dado (transient: false).
         if ($this->mapper->isError($response['body'])) {
-            throw new ProviderUnavailable($this->identifier());
+            throw new ProviderUnavailable(
+                $this->identifier(),
+                transient: false,
+                context: [
+                    'http_status' => $response['status'],
+                    'body' => $response['body'],
+                ],
+            );
         }
 
         return $this->mapper->toResult($request->type, $response['body'], [

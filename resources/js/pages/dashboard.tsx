@@ -181,24 +181,48 @@ function Row({ label, value }: { label: string; value: number }) {
 
 function ConsumptionChart({ data }: { data: ConsumptionPoint[] }) {
     const max = Math.max(1, ...data.map((d) => d.count));
+    const plotHeight = 128;
 
     return (
-        <div className="flex h-44 items-end gap-3 pt-2">
-            {data.map((d) => (
-                <div key={d.date} className="flex flex-1 flex-col items-center gap-2">
-                    <span className="text-xs font-medium tabular-nums text-muted-foreground">{d.count || ''}</span>
-                    <div className="flex w-full flex-1 items-end">
+        <div className="flex gap-2 sm:gap-3">
+            {data.map((d) => {
+                const barHeight =
+                    d.count === 0 ? 2 : Math.max(10, Math.round((d.count / max) * plotHeight));
+
+                return (
+                    <div key={d.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
                         <div
-                            className="w-full rounded-t-md bg-gradient-to-t from-brand-green/60 to-brand-green transition-all"
-                            style={{ height: `${(d.count / max) * 100}%`, minHeight: d.count > 0 ? 6 : 2 }}
-                            title={`${d.count} consulta(s)`}
-                        />
+                            className="flex w-full flex-col items-center justify-end"
+                            style={{ height: plotHeight }}
+                        >
+                            {d.count > 0 && (
+                                <span className="mb-1.5 text-xs font-semibold tabular-nums text-foreground">
+                                    {d.count}
+                                </span>
+                            )}
+                            <div
+                                className="w-full rounded-t-md bg-gradient-to-t from-brand-green/70 to-brand-green transition-all"
+                                style={{ height: barHeight }}
+                                title={`${d.count} consulta(s)`}
+                            />
+                        </div>
+                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                            {formatChartDay(d.date)}
+                        </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">{d.date.slice(5)}</span>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
+}
+
+function formatChartDay(isoDate: string): string {
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) {
+        return isoDate.slice(5);
+    }
+
+    return `${parts[2]}/${parts[1]}`;
 }
 
 function formatDate(value: string): string {

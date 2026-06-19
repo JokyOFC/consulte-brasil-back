@@ -76,11 +76,20 @@ final readonly class ProviderRouter
                 return $result;
             } catch (ProviderUnavailable $e) {
                 $lastReason = $e->reason ?? $e->getMessage();
-                $this->breaker->recordFailure($descriptor->providerId, $request->type->code);
+
+                // Só outage transitório (timeout/5xx/conexão) abre o circuito.
+                // Rejeição de negócio (4xx, "consulta não concluída") é por
+                // requisição — não pode derrubar o provedor para todos.
+                if ($e->transient) {
+                    $this->breaker->recordFailure($descriptor->providerId, $request->type->code);
+                }
+
                 $this->logger->warning('provider.failover', [
                     'provider' => $descriptor->identifier,
                     'query_type' => $request->type->code,
                     'reason' => $lastReason,
+                    'transient' => $e->transient,
+                    'provider_body' => $this->summarizeContext($e->context),
                     'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
                 ]);
             }
@@ -100,6 +109,23 @@ final readonly class ProviderRouter
             $request->type->code,
             $this->buildUserMessage($lastReason),
         );
+    }
+
+    /**
+     * Serializa o detalhe de diagnóstico do provedor (corpo do erro) com um
+     * teto de tamanho, para o log de failover não explodir.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function summarizeContext(array $context): ?string
+    {
+        if ($context === []) {
+            return null;
+        }
+
+        $json = (string) json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return mb_strlen($json) > 2000 ? mb_substr($json, 0, 2000).'…' : $json;
     }
 
     private function buildUserMessage(?string $reason): string

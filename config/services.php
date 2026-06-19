@@ -49,6 +49,18 @@ return [
 
         'timeout' => (int) env('API_BRASIL_TIMEOUT', 8),
 
+        // Endpoints de crédito (path .../credits) agregam bureaus (SPC, Serasa,
+        // Boa Vista, SCR Bacen) e costumam levar 10-30s. Um timeout curto faz a
+        // conexão cair antes da resposta → ProviderUnavailable → 503 indevido.
+        // Aplicado automaticamente a qualquer endpoint contendo "credits".
+        'credit_timeout' => (int) env('API_BRASIL_CREDIT_TIMEOUT', 45),
+
+        // Override fino de timeout (segundos) por query_type, quando necessário.
+        // queryType => segundos. Vence a heurística de crédito acima.
+        'timeouts' => [
+            // 'cpf_analise_credito_basic' => 60,
+        ],
+
         // QueryType code → path no gateway. CPF/CNPJ ficam sob /dados.
         'endpoints' => [
             'cpf' => 'dados/cpf',

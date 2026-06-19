@@ -37,8 +37,9 @@ final readonly class ApiBrasilHttpClient
         ?string $baseUrl = null,
         ?string $apiToken = null,
         ?string $deviceToken = null,
+        ?int $timeoutSeconds = null,
     ): array {
-        return $this->send('POST', $path, $payload, $baseUrl, $apiToken, $deviceToken);
+        return $this->send('POST', $path, $payload, $baseUrl, $apiToken, $deviceToken, $timeoutSeconds);
     }
 
     /**
@@ -55,10 +56,12 @@ final readonly class ApiBrasilHttpClient
         ?string $baseUrl = null,
         ?string $apiToken = null,
         ?string $deviceToken = null,
+        ?int $timeoutSeconds = null,
     ): array {
         $baseUrl = $baseUrl ?? $this->baseUrl;
         $apiToken = $apiToken ?? $this->apiToken;
         $method = strtoupper($method);
+        $timeout = $timeoutSeconds !== null && $timeoutSeconds > 0 ? $timeoutSeconds : $this->timeoutSeconds;
 
         // A APIBrasil identifica o serviço/credito pelo header DeviceToken,
         // além do Bearer da conta. Sem ele, todos os endpoints respondem 401.
@@ -73,7 +76,7 @@ final readonly class ApiBrasilHttpClient
                 ->withToken($apiToken)
                 ->withHeaders($headers)
                 ->acceptJson()
-                ->timeout($this->timeoutSeconds);
+                ->timeout($timeout);
 
             // GET → params na query string; demais métodos → corpo JSON.
             if ($method === 'GET') {

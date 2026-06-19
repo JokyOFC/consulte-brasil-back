@@ -50,7 +50,7 @@ final readonly class CpfCnpjHttpClient
                 ->timeout($this->timeoutSeconds)
                 ->get($url, $query);
         } catch (ConnectionException $e) {
-            throw new ProviderUnavailable(self::PROVIDER_IDENTIFIER, $e);
+            throw new ProviderUnavailable(self::PROVIDER_IDENTIFIER, previous: $e);
         }
 
         // 5xx/408/429 → upstream instável → failover (e estorno do crédito).

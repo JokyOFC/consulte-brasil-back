@@ -72,6 +72,8 @@ final class ConsultationServiceProvider extends ServiceProvider
                 bodyKeys: (array) ($config['body_keys'] ?? []),
                 methods: (array) ($config['methods'] ?? []),
                 bodies: (array) ($config['bodies'] ?? []),
+                timeouts: (array) ($config['timeouts'] ?? []),
+                creditTimeoutSeconds: (int) ($config['credit_timeout'] ?? 45),
             );
         });
 
