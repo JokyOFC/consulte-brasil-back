@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Src\Modules\Audit\Infrastructure\Http\Support\RequestResponseSummarizer;
 use Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models\RequestLogModel;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,6 +22,10 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class LogRequest
 {
+    public function __construct(
+        private RequestResponseSummarizer $responseSummarizer,
+    ) {}
+
     /** Chaves do corpo cujo valor é mascarado antes de persistir. */
     private const REDACTED_KEYS = [
         'password', 'password_confirmation', 'current_password',
@@ -129,27 +134,14 @@ final class LogRequest
         return $data;
     }
 
-    /**
-     * Resumo da resposta (limitado), preservando o envelope de erro/dados,
-     * mas descartando o payload bruto pesado do provedor.
-     *
-     * @return array<string, mixed>
-     */
     private function responseSummary(Response $response): array
     {
         $content = $response->getContent();
+
         if ($content === false || $content === '') {
             return [];
         }
 
-        $decoded = json_decode($content, true);
-        if (! is_array($decoded)) {
-            return ['raw' => Str::limit($content, 2000)];
-        }
-
-        // Remove o payload bruto do provedor para manter o log enxuto.
-        unset($decoded['data']['data']['raw']);
-
-        return $decoded;
+        return $this->responseSummarizer->summarize($content);
     }
 }
