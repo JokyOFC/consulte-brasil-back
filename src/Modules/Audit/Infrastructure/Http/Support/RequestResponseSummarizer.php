@@ -8,15 +8,15 @@ use Illuminate\Support\Str;
 
 /**
  * Reduz respostas da API antes de persistir em request_logs.
- * Consultas podem retornar PDFs/base64 enormes — o log guarda só metadados.
+ * Remove apenas campos pesados (PDF/base64); nunca altera a resposta HTTP ao cliente.
  */
 final class RequestResponseSummarizer
 {
-    /** Limite conservador antes da cifra Laravel (coluna TEXT ≈ 64 KiB). */
-    private const MAX_JSON_BYTES = 48_000;
+    /** Limite conservador antes da cifra Laravel (coluna LONGTEXT, margem de segurança). */
+    private const MAX_JSON_BYTES = 120_000;
 
     /** @var list<string> */
-    private const OMITTED_RESPONSE_DATA_KEYS = [
+    private const HEAVY_KEYS = [
         'raw',
         'comprovantePdfBase64',
         'pdfBase64',
@@ -35,43 +35,45 @@ final class RequestResponseSummarizer
             return ['raw' => Str::limit($content, 2000)];
         }
 
-        return $this->enforceMaxSize($this->trimHeavyFields($decoded));
+        /** @var array<string, mixed> $clone */
+        $clone = json_decode(json_encode($decoded, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+
+        return $this->enforceMaxSize($this->stripHeavyFields($clone));
     }
 
-    /** @param array<string, mixed> $decoded */
-    private function trimHeavyFields(array $decoded): array
+    /**
+     * @param array<string, mixed> $decoded
+     * @return array<string, mixed>
+     */
+    private function stripHeavyFields(array $decoded): array
     {
         if (isset($decoded['data']) && is_array($decoded['data'])) {
-            $decoded['data'] = $this->summarizeApiDataBlock($decoded['data']);
+            $decoded['data'] = $this->stripHeavyFieldsRecursive($decoded['data']);
         }
 
         return $decoded;
     }
 
     /**
-     * Envelope de sucesso da API: { consultation_id, provider, data: {...} }.
-     *
-     * @param array<string, mixed> $block
+     * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function summarizeApiDataBlock(array $block): array
+    private function stripHeavyFieldsRecursive(array $data): array
     {
-        if (! isset($block['data']) || ! is_array($block['data'])) {
-            return $block;
+        foreach (self::HEAVY_KEYS as $key) {
+            unset($data[$key]);
         }
 
-        $payload = $block['data'];
-        $block['data'] = [
-            '_omitted' => true,
-            'field_count' => count($payload),
-            'fields' => array_values(array_slice(array_keys($payload), 0, 50)),
-        ];
-
-        foreach (self::OMITTED_RESPONSE_DATA_KEYS as $key) {
-            unset($block[$key]);
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                /** @var array<string, mixed> $value */
+                $data[$key] = $this->stripHeavyFieldsRecursive($value);
+            } elseif (is_string($value) && strlen($value) > 4_000) {
+                $data[$key] = Str::limit($value, 500, '…');
+            }
         }
 
-        return $block;
+        return $data;
     }
 
     /** @param array<string, mixed> $data */
@@ -83,6 +85,15 @@ final class RequestResponseSummarizer
             return $data;
         }
 
+        if (isset($data['data']) && is_array($data['data'])) {
+            $data['data'] = $this->aggressivelyTrim($data['data']);
+            $json = json_encode($data, JSON_THROW_ON_ERROR);
+
+            if (strlen($json) <= self::MAX_JSON_BYTES) {
+                return $data;
+            }
+        }
+
         $consultationId = null;
         if (isset($data['data']) && is_array($data['data'])) {
             $candidate = $data['data']['consultation_id'] ?? null;
@@ -92,9 +103,32 @@ final class RequestResponseSummarizer
         return array_filter([
             'data' => array_filter([
                 'consultation_id' => $consultationId,
-                '_truncated' => true,
+                'provider' => is_array($data['data'] ?? null) ? ($data['data']['provider'] ?? null) : null,
+                'amount_charged' => is_array($data['data'] ?? null) ? ($data['data']['amount_charged'] ?? null) : null,
+                'from_cache' => is_array($data['data'] ?? null) ? ($data['data']['from_cache'] ?? null) : null,
+                '_audit_truncated' => true,
             ]),
             'error' => is_array($data['error'] ?? null) ? $data['error'] : null,
         ], static fn ($value) => $value !== null);
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     * @return array<string, mixed>
+     */
+    private function aggressivelyTrim(array $block): array
+    {
+        unset($block['data']);
+
+        foreach ($block as $key => $value) {
+            if (is_array($value)) {
+                /** @var array<string, mixed> $value */
+                $block[$key] = $this->stripHeavyFieldsRecursive($value);
+            } elseif (is_string($value) && strlen($value) > 500) {
+                $block[$key] = Str::limit($value, 500, '…');
+            }
+        }
+
+        return $block;
     }
 }

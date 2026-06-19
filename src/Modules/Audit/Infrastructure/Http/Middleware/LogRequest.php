@@ -142,6 +142,7 @@ final class LogRequest
             return [];
         }
 
-        return $this->responseSummarizer->summarize($content);
+        // Trabalha sempre sobre cópia do corpo serializado — nunca altera a resposta HTTP.
+        return $this->responseSummarizer->summarize((string) $content);
     }
 }

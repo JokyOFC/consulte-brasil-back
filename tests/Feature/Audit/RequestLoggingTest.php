@@ -6,11 +6,19 @@ namespace Tests\Feature\Audit;
 
 use Database\Seeders\QueryTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models\RequestLogModel;
+use Src\Modules\Billing\Application\DTO\GrantCreditsInput;
+use Src\Modules\Billing\Application\UseCase\GrantCredits;
 use Src\Modules\Identity\Application\DTO\CreateAccountInput;
 use Src\Modules\Identity\Application\DTO\IssueApiKeyInput;
 use Src\Modules\Identity\Application\UseCase\CreateAccount;
 use Src\Modules\Identity\Application\UseCase\IssueApiKey;
+use Src\Modules\Provider\Domain\Entity\Provider;
+use Src\Modules\Provider\Domain\Repository\ProviderRepository;
+use Src\Modules\Provider\Domain\ValueObject\ProviderStatus;
+use Src\Shared\Application\Contracts\IdGenerator;
+use Tests\Support\Consultation\FakeProvider;
 use Tests\TestCase;
 
 final class RequestLoggingTest extends TestCase
@@ -90,5 +98,69 @@ final class RequestLoggingTest extends TestCase
         $this->assertSame('***', $log->body['password'] ?? null);
         $this->assertFalse($log->success);
         $this->assertSame(402, $log->status_code);
+    }
+
+    public function test_consultation_api_response_stays_intact_while_log_strips_heavy_fields(): void
+    {
+        $account = app(CreateAccount::class)->handle(new CreateAccountInput('ACME', '44.555.666/0001-81'));
+        app(GrantCredits::class)->handle(new GrantCreditsInput($account->id->value, 500));
+        $issued = app(IssueApiKey::class)->handle(new IssueApiKeyInput($account->id->value, 'integration'));
+        $token = $issued->plainToken;
+
+        DB::table('query_types')->insert([
+            'id' => app(IdGenerator::class)->generate(),
+            'code' => 'cpf',
+            'name' => 'CPF',
+            'default_credit_cost' => 2,
+            'cache_ttl_seconds' => 0,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $providerId = app(IdGenerator::class)->generate();
+        app(ProviderRepository::class)->save(new Provider(
+            id: $providerId,
+            identifier: 'alpha',
+            name: 'alpha',
+            status: ProviderStatus::Enabled,
+            baseUrl: null,
+            credentials: [],
+        ));
+        DB::table('provider_capabilities')->insert([
+            'id' => app(IdGenerator::class)->generate(),
+            'provider_id' => $providerId,
+            'query_type' => 'cpf',
+            'priority' => 10,
+            'price_cents' => 2,
+            'enabled' => true,
+            'config' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $fake = new FakeProvider('alpha', payload: [
+            'nome' => 'JOAO DA SILVA',
+            'certificadoPdfBase64' => str_repeat('A', 50_000),
+            'raw' => ['blob' => str_repeat('B', 50_000)],
+        ]);
+        $key = get_class($fake).':'.$fake->identifier();
+        $this->app->instance($key, $fake);
+        $this->app->tag([$key], 'consultation.provider');
+
+        $response = $this->withToken($token)
+            ->postJson('/api/v1/consult/cpf', ['params' => ['document' => '11144477735']])
+            ->assertOk();
+
+        $response->assertJsonPath('data.data.nome', 'JOAO DA SILVA');
+        $response->assertJsonPath('data.data.certificadoPdfBase64', str_repeat('A', 50_000));
+        $response->assertJsonMissing(['_omitted' => true]);
+
+        $log = RequestLogModel::query()->where('path', '/api/v1/consult/cpf')->latest('created_at')->first();
+        $this->assertNotNull($log);
+        $this->assertSame('JOAO DA SILVA', $log->response['data']['data']['nome'] ?? null);
+        $this->assertArrayNotHasKey('certificadoPdfBase64', $log->response['data']['data'] ?? []);
+        $this->assertArrayNotHasKey('raw', $log->response['data']['data'] ?? []);
+        $this->assertArrayNotHasKey('_omitted', $log->response['data']['data'] ?? []);
     }
 }
