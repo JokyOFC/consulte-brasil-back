@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { FileSearch, FileText, KeyRound, Layers, LayoutGrid, ScrollText, Search, Server, Settings, Users, Wallet } from 'lucide-react';
+import { FileSearch, FileText, KeyRound, Layers, LayoutGrid, ScrollText, Search, Server, Settings, Users, Wallet, Webhook } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -20,6 +20,7 @@ const clientNav: NavItem[] = [
     { title: 'Consultas', href: '/client/consultations', icon: Search },
     { title: 'Financeiro', href: '/client/billing', icon: Wallet },
     { title: 'Minhas chaves', href: '/client/api-keys', icon: KeyRound },
+    { title: 'Webhook', href: '/client/webhook', icon: Webhook },
     { title: 'Logs', href: '/client/logs', icon: ScrollText },
 ];
 

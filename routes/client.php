@@ -7,6 +7,7 @@ use Src\Modules\Audit\Infrastructure\Http\Controllers\Client\RequestLogsClientCo
 use Src\Modules\Billing\Infrastructure\Http\Controllers\Client\ClientBillingController;
 use Src\Modules\Consultation\Infrastructure\Http\Controllers\Client\ConsultationsClientController;
 use Src\Modules\Identity\Infrastructure\Http\Controllers\Client\ApiKeysController;
+use Src\Modules\Identity\Infrastructure\Http\Controllers\Client\WebhookClientController;
 
 Route::middleware(['auth', 'verified'])
     ->prefix('client')
@@ -15,6 +16,10 @@ Route::middleware(['auth', 'verified'])
         Route::get('/api-keys', [ApiKeysController::class, 'index'])->name('api-keys.index');
         Route::post('/api-keys', [ApiKeysController::class, 'store'])->name('api-keys.store');
         Route::delete('/api-keys/{apiKeyId}', [ApiKeysController::class, 'destroy'])->name('api-keys.destroy');
+
+        Route::get('/webhook', [WebhookClientController::class, 'index'])->name('webhook.index');
+        Route::put('/webhook', [WebhookClientController::class, 'update'])->name('webhook.update');
+        Route::post('/webhook/regenerate-secret', [WebhookClientController::class, 'regenerateSecret'])->name('webhook.regenerate-secret');
 
         // Logs das requisições da própria conta
         Route::get('/logs', [RequestLogsClientController::class, 'index'])->name('logs.index');

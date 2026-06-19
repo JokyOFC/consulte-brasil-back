@@ -14,6 +14,7 @@ use Src\Modules\Consultation\Application\DTO\ExecuteConsultationOutput;
 use Src\Modules\Consultation\Application\Port\ConsultationResultCache;
 use Src\Modules\Consultation\Application\Service\ProviderRouter;
 use Src\Modules\Consultation\Domain\Entity\Consultation;
+use Src\Modules\Consultation\Domain\Event\ConsultationCompleted;
 use Src\Modules\Consultation\Domain\Exception\AllProvidersFailed;
 use Src\Modules\Consultation\Domain\Exception\UnknownQueryType;
 use Src\Modules\Consultation\Domain\Port\QueryTypeCatalog;
@@ -24,6 +25,7 @@ use Src\Modules\Consultation\Infrastructure\Enrichment\CachedConsultationResultE
 use Src\Modules\Provider\Domain\Port\ProviderRegistry;
 use Src\Modules\Provider\Domain\Repository\ProviderRepository;
 use Src\Shared\Application\Contracts\Clock;
+use Src\Shared\Application\Contracts\EventBus;
 use Src\Shared\Application\Contracts\IdGenerator;
 
 /**
@@ -52,6 +54,7 @@ final readonly class ExecuteConsultation
         private CachedConsultationResultEnricher $cachedResultEnricher,
         private IdGenerator $ids,
         private Clock $clock,
+        private EventBus $events,
     ) {}
 
     public function handle(ExecuteConsultationInput $input): ExecuteConsultationOutput
@@ -123,6 +126,12 @@ final readonly class ExecuteConsultation
 
             $this->commit->handle($reservation->reservationId);
             $this->consultations->save($consultation);
+            $this->publishCompleted(
+                consultation: $consultation,
+                fromCache: false,
+                providerIdentifier: $result->meta->providerIdentifier,
+                data: $result->data,
+            );
 
             if ($cacheTtl > 0) {
                 $this->resultCache->put(
@@ -148,6 +157,12 @@ final readonly class ExecuteConsultation
             $this->refund->handle($reservation->reservationId);
             $consultation->markRefunded();
             $this->consultations->save($consultation);
+            $this->publishCompleted(
+                consultation: $consultation,
+                fromCache: false,
+                providerIdentifier: null,
+                failureReason: 'all_providers_failed',
+            );
 
             throw $e;
         }
@@ -184,6 +199,12 @@ final readonly class ExecuteConsultation
 
         $this->commit->handle($reservationId);
         $this->consultations->save($consultation);
+        $this->publishCompleted(
+            consultation: $consultation,
+            fromCache: true,
+            providerIdentifier: $cached->providerIdentifier,
+            data: $data,
+        );
 
         return new ExecuteConsultationOutput(
             consultationId: $consultation->id,
@@ -192,6 +213,27 @@ final readonly class ExecuteConsultation
             creditsCharged: $creditCost,
             fromCache: true,
         );
+    }
+
+    /** @param array<string, mixed>|null $data */
+    private function publishCompleted(
+        Consultation $consultation,
+        bool $fromCache,
+        ?string $providerIdentifier,
+        ?array $data = null,
+        ?string $failureReason = null,
+    ): void {
+        $this->events->publish(new ConsultationCompleted(
+            consultationId: $consultation->id,
+            accountId: $consultation->accountId,
+            queryType: $consultation->queryType,
+            status: $consultation->status,
+            creditCost: $consultation->creditCost,
+            fromCache: $fromCache,
+            providerIdentifier: $providerIdentifier,
+            data: $data,
+            failureReason: $failureReason,
+        ));
     }
 
     /**

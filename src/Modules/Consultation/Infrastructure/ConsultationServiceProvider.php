@@ -6,6 +6,7 @@ namespace Src\Modules\Consultation\Infrastructure;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface;
@@ -17,7 +18,9 @@ use Src\Modules\Consultation\Domain\Repository\ConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Cache\CacheConsultationResultCache;
 use Src\Modules\Consultation\Infrastructure\Console\PurgeConsultationRequestHashCommand;
 use Src\Modules\Consultation\Infrastructure\Console\RefreshCachedPdfResultsCommand;
+use Src\Modules\Consultation\Domain\Event\ConsultationCompleted;
 use Src\Modules\Consultation\Infrastructure\Enrichment\CachedConsultationResultEnricher;
+use Src\Modules\Consultation\Infrastructure\Listeners\DispatchConsultationWebhook;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentQueryTypeCatalog;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\QueryTypeModel;
@@ -112,6 +115,8 @@ final class ConsultationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/Persistence/Migrations');
+
+        Event::listen(ConsultationCompleted::class, DispatchConsultationWebhook::class);
 
         QueryTypeModel::observe(QueryTypeCacheObserver::class);
         ProviderModel::observe(ProviderCacheObserver::class);
