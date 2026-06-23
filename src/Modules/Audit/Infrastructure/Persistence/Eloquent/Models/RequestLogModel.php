@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models;
 
+use App\Support\Casts\UtcDatetime;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -32,6 +33,6 @@ final class RequestLogModel extends Model
         'headers' => 'encrypted:array',
         'body' => 'encrypted:array',
         'response' => 'encrypted:array',
-        'created_at' => 'datetime',
+        'created_at' => UtcDatetime::class,
     ];
 }

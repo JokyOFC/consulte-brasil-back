@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models;
 
+use App\Support\Casts\UtcDatetime;
 use Illuminate\Database\Eloquent\Model;
 
 final class ConsultationModel extends Model
@@ -22,6 +23,6 @@ final class ConsultationModel extends Model
         'credit_cost' => 'integer',
         'latency_ms' => 'integer',
         'http_status' => 'integer',
-        'created_at' => 'datetime',
+        'created_at' => UtcDatetime::class,
     ];
 }
