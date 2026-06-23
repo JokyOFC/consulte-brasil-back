@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Tests\Feature\Audit;
 
 use ReflectionMethod;
-use Src\Modules\Audit\Infrastructure\Http\Middleware\LogRequest;
+use Src\Modules\Audit\Infrastructure\Http\Support\RequestLogRecorder;
 use Tests\TestCase;
 
 final class CardDataMaskingTest extends TestCase
 {
     public function test_card_fields_are_masked_before_persisting(): void
     {
-        $middleware = new LogRequest;
-        $redact = new ReflectionMethod($middleware, 'redact');
+        $recorder = app(RequestLogRecorder::class);
+        $redact = new ReflectionMethod($recorder, 'redact');
 
-        $masked = $redact->invoke($middleware, [
+        $masked = $redact->invoke($recorder, [
             'amount' => 5000,
             'card_number' => '4111111111111111',
             'cvv' => '123',
@@ -30,8 +30,6 @@ final class CardDataMaskingTest extends TestCase
         $this->assertSame('***', $masked['cvv']);
         $this->assertSame('***', $masked['card_token']);
         $this->assertSame('***', $masked['payer']['security_code']);
-
-        // Campos não sensíveis permanecem intactos.
         $this->assertSame(5000, $masked['amount']);
         $this->assertSame('a@b.com', $masked['payer']['email']);
     }

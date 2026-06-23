@@ -163,4 +163,66 @@ final class RequestLoggingTest extends TestCase
         $this->assertArrayNotHasKey('raw', $log->response['data']['data'] ?? []);
         $this->assertArrayNotHasKey('_omitted', $log->response['data']['data'] ?? []);
     }
+
+    public function test_huge_consultation_response_still_creates_request_log(): void
+    {
+        $account = app(CreateAccount::class)->handle(new CreateAccountInput('BIG', '55.666.777/0001-81'));
+        app(GrantCredits::class)->handle(new GrantCreditsInput($account->id->value, 500));
+        $issued = app(IssueApiKey::class)->handle(new IssueApiKeyInput($account->id->value, 'integration'));
+        $token = $issued->plainToken;
+
+        DB::table('query_types')->insert([
+            'id' => app(IdGenerator::class)->generate(),
+            'code' => 'cpf_antecedentes',
+            'name' => 'CPF Antecedentes',
+            'default_credit_cost' => 2,
+            'cache_ttl_seconds' => 0,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $providerId = app(IdGenerator::class)->generate();
+        app(ProviderRepository::class)->save(new Provider(
+            id: $providerId,
+            identifier: 'alpha',
+            name: 'alpha',
+            status: ProviderStatus::Enabled,
+            baseUrl: null,
+            credentials: [],
+        ));
+        DB::table('provider_capabilities')->insert([
+            'id' => app(IdGenerator::class)->generate(),
+            'provider_id' => $providerId,
+            'query_type' => 'cpf_antecedentes',
+            'priority' => 10,
+            'price_cents' => 2,
+            'enabled' => true,
+            'config' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $fake = new FakeProvider('alpha', payload: [
+            'nome' => 'MARIA SILVA',
+            'certificadoPdfBase64' => str_repeat('A', 300_000),
+            'comprovantePdfBase64' => str_repeat('B', 300_000),
+            'raw' => ['blob' => str_repeat('C', 300_000)],
+        ]);
+        $key = get_class($fake).':'.$fake->identifier();
+        $this->app->instance($key, $fake);
+        $this->app->tag([$key], 'consultation.provider');
+
+        $this->withToken($token)
+            ->postJson('/api/v1/consult/cpf_antecedentes', ['params' => ['document' => '11144477735']])
+            ->assertOk();
+
+        $log = RequestLogModel::query()->where('path', '/api/v1/consult/cpf_antecedentes')->latest('created_at')->first();
+
+        $this->assertNotNull($log);
+        $this->assertTrue($log->success);
+        $this->assertSame($account->id->value, $log->account_id);
+        $this->assertSame('MARIA SILVA', $log->response['data']['data']['nome'] ?? null);
+        $this->assertArrayNotHasKey('certificadoPdfBase64', $log->response['data']['data'] ?? []);
+    }
 }

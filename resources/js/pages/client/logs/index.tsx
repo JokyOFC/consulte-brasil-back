@@ -39,7 +39,7 @@ export default function ClientLogsIndex() {
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Logs das minhas consultas"
-                    description="Histórico das chamadas à API com a sua conta: corpo enviado, status e resposta."
+                    description="Histórico das chamadas à API e consultas feitas pelo painel: corpo enviado, status e resposta."
                 />
 
                 <div className="flex flex-wrap items-center gap-2">

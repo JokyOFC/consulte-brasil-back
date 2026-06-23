@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Src\Modules\Audit\Infrastructure\Http\Support\RequestLogRecorder;
 use Src\Modules\Billing\Domain\Exception\InsufficientCredits;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Consultation\Application\DTO\ExecuteConsultationInput;
@@ -17,12 +18,17 @@ use Src\Modules\Consultation\Domain\Exception\AllProvidersFailed;
 use Src\Modules\Consultation\Domain\Exception\NoProviderAvailable;
 use Src\Modules\Consultation\Domain\Exception\UnknownQueryType;
 use Src\Modules\Consultation\Infrastructure\Http\Requests\ExecuteConsultationWebRequest;
+use Throwable;
 
 /**
  * Painel do cliente: catálogo de consultas e execução via sessão web.
  */
 final class ConsultationsClientController
 {
+    public function __construct(
+        private RequestLogRecorder $requestLogRecorder,
+    ) {}
+
     public function index(Request $request, ClientConsultationCatalog $catalog, WalletRepository $wallets): Response
     {
         $accountId = $request->user()->account_id;
@@ -47,6 +53,9 @@ final class ConsultationsClientController
     ): RedirectResponse {
         abort_if($request->user()->account_id === null, 422, 'User has no account.');
 
+        $startedAt = microtime(true);
+        $body = $request->validated();
+
         try {
             $output = $execute->handle(new ExecuteConsultationInput(
                 accountId: $request->user()->account_id,
@@ -55,6 +64,16 @@ final class ConsultationsClientController
                 params: $request->validatedParams(),
             ));
         } catch (InsufficientCredits) {
+            $this->logWebConsultation(
+                $request,
+                $queryType,
+                $startedAt,
+                402,
+                false,
+                $body,
+                ['error' => ['type' => 'insufficient_credits', 'message' => 'Saldo insuficiente.']],
+            );
+
             return redirect()
                 ->route('client.consultations.index')
                 ->with('error', 'Saldo insuficiente. Recarregue sua carteira para continuar.')
@@ -66,11 +85,52 @@ final class ConsultationsClientController
                 ? $e->userMessage
                 : 'Não foi possível concluir a consulta. Nenhum valor foi debitado.';
 
+            $this->logWebConsultation(
+                $request,
+                $queryType,
+                $startedAt,
+                503,
+                false,
+                $body,
+                ['error' => ['type' => 'all_providers_failed', 'message' => $message]],
+            );
+
             return redirect()
                 ->route('client.consultations.index')
                 ->with('error', $message)
                 ->with('selected_query_type', $queryType);
+        } catch (Throwable $e) {
+            $this->logWebConsultation(
+                $request,
+                $queryType,
+                $startedAt,
+                500,
+                false,
+                $body,
+                ['error' => ['type' => 'internal_error', 'message' => 'Erro ao processar consulta.']],
+            );
+
+            throw $e;
         }
+
+        $responseSummary = $this->requestLogRecorder->buildConsultationResponseSummary(
+            $output->consultationId,
+            $output->providerIdentifier,
+            $output->creditsCharged,
+            $output->fromCache,
+            $output->data,
+        );
+
+        $this->logWebConsultation(
+            $request,
+            $queryType,
+            $startedAt,
+            200,
+            true,
+            $body,
+            $responseSummary,
+            $output->consultationId,
+        );
 
         return redirect()
             ->route('client.consultations.index')
@@ -85,5 +145,33 @@ final class ConsultationsClientController
                     'data' => $output->data,
                 ],
             ]);
+    }
+
+    /** @param array<string, mixed> $body */
+    /** @param array<string, mixed> $responseSummary */
+    private function logWebConsultation(
+        Request $request,
+        string $queryType,
+        float $startedAt,
+        int $statusCode,
+        bool $success,
+        array $body,
+        array $responseSummary,
+        ?string $consultationId = null,
+    ): void {
+        try {
+            $this->requestLogRecorder->recordWebConsultation(
+                $request,
+                $queryType,
+                $statusCode,
+                $success,
+                $body,
+                $responseSummary,
+                $consultationId,
+                $startedAt,
+            );
+        } catch (Throwable) {
+            // Auditoria não pode interromper a consulta.
+        }
     }
 }

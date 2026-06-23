@@ -7,172 +7,58 @@ namespace Src\Modules\Audit\Infrastructure\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
-use Src\Modules\Audit\Infrastructure\Http\Support\RequestResponseSummarizer;
-use Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models\RequestLogModel;
-use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
+use Src\Modules\Audit\Infrastructure\Http\Support\RequestLogRecorder;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Registra cada request da API pública (sucesso ou erro) em request_logs,
- * com o máximo de informação possível — incluindo o corpo da requisição.
+ * Registra cada request da API pública (sucesso ou erro) em request_logs.
  *
- * Roda em terminate() para não somar latência à resposta do cliente.
- * Campos sensíveis (senha, token, authorization) são mascarados antes de
- * gravar; o restante é cifrado em repouso pelo model.
+ * - Após $next() quando a resposta é gerada normalmente (confiável em produção).
+ * - Em terminate() quando a auth/exceções produzem a resposta depois (401, 422…).
  */
 final class LogRequest
 {
+    private const RECORDED_FLAG = 'audit.recorded';
+
     public function __construct(
-        private RequestResponseSummarizer $responseSummarizer,
+        private RequestLogRecorder $recorder,
     ) {}
-
-    /** Chaves do corpo cujo valor é mascarado antes de persistir. */
-    private const REDACTED_KEYS = [
-        'password', 'password_confirmation', 'current_password',
-        'token', 'secret', 'api_key', 'apikey', 'access_token',
-        'device_token', 'sandbox_token', 'bearer',
-        'document', 'cpf', 'cnpj', 'nr_cpf', 'nr_cnpj',
-        // Dados de cartão (Mercado Pago) — nunca persistir em claro.
-        'card_number', 'cardnumber', 'cvv', 'security_code', 'securitycode',
-        'card_token', 'cardtoken', 'card_token_id',
-    ];
-
-    /** Headers que nunca devem ir em claro para o log. */
-    private const REDACTED_HEADERS = [
-        'authorization', 'cookie', 'x-xsrf-token', 'php-auth-pw',
-    ];
-
-    private const MASK = '***';
 
     public function handle(Request $request, Closure $next): Response
     {
-        $request->attributes->set('audit.started_at', microtime(true));
+        $startedAt = microtime(true);
+        $request->attributes->set('audit.started_at', $startedAt);
 
-        return $next($request);
+        $response = $next($request);
+
+        $this->recordOnce($request, $response, $startedAt);
+
+        return $response;
     }
 
     public function terminate(Request $request, Response $response): void
     {
-        try {
-            $this->record($request, $response);
-        } catch (\Throwable $e) {
-            // Logging nunca pode quebrar a request.
-            Log::warning('audit.request_log_failed', ['error' => $e->getMessage()]);
-        }
-    }
-
-    private function record(Request $request, Response $response): void
-    {
         $startedAt = $request->attributes->get('audit.started_at');
-        $durationMs = is_float($startedAt)
-            ? (int) round((microtime(true) - $startedAt) * 1000)
-            : null;
+        $startedAt = is_float($startedAt) ? $startedAt : microtime(true);
 
-        $user = $request->user();
-        $accountId = $user?->getAuthIdentifier();
-        $apiKeyId = $request->attributes->get('consulte.api_key_id');
-
-        $status = $response->getStatusCode();
-        $responseSummary = $this->responseSummary($response);
-
-        RequestLogModel::query()->create([
-            'id' => (string) Str::uuid(),
-            'account_id' => is_string($accountId) ? $accountId : null,
-            'api_key_id' => is_string($apiKeyId) ? $apiKeyId : null,
-            'method' => $request->getMethod(),
-            'path' => Str::limit($request->getPathInfo(), 1000, ''),
-            'route_name' => $request->route()?->getName(),
-            'status_code' => $status,
-            'success' => $status < 400,
-            'duration_ms' => $durationMs,
-            'ip_address' => $request->ip(),
-            'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
-            'query' => $this->redact($request->query()),
-            'headers' => $this->sanitizeHeaders($request),
-            'body' => $this->redact($request->all()),
-            'response' => $responseSummary,
-            'consultation_id' => $this->resolveConsultationId($request, $responseSummary),
-            'created_at' => now(),
-        ]);
+        $this->recordOnce($request, $response, $startedAt);
     }
 
-    /**
-     * @param  array<string, mixed>  $responseSummary
-     */
-    private function resolveConsultationId(Request $request, array $responseSummary): ?string
+    private function recordOnce(Request $request, Response $response, float $startedAt): void
     {
-        $fromResponse = $responseSummary['data']['consultation_id'] ?? null;
-        if (is_string($fromResponse) && $fromResponse !== '') {
-            return $fromResponse;
+        if ($request->attributes->get(self::RECORDED_FLAG) === true) {
+            return;
         }
 
-        if (preg_match('#/api/v1/consult/([^/]+)#', $request->getPathInfo(), $matches) !== 1) {
-            return null;
+        $request->attributes->set(self::RECORDED_FLAG, true);
+
+        try {
+            $this->recorder->recordApiRequest($request, $response, $startedAt);
+        } catch (\Throwable $e) {
+            Log::warning('audit.request_log_failed', [
+                'error' => $e->getMessage(),
+                'path' => $request->getPathInfo(),
+            ]);
         }
-
-        $accountId = $request->user()?->getAuthIdentifier();
-        if (! is_string($accountId)) {
-            return null;
-        }
-
-        $consultationId = ConsultationModel::query()
-            ->where('account_id', $accountId)
-            ->where('query_type', urldecode($matches[1]))
-            ->where('created_at', '>=', now()->subSeconds(30))
-            ->orderByDesc('created_at')
-            ->value('id');
-
-        return is_string($consultationId) ? $consultationId : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function sanitizeHeaders(Request $request): array
-    {
-        $headers = [];
-        foreach ($request->headers->all() as $name => $values) {
-            $value = is_array($values) ? implode(', ', $values) : (string) $values;
-            $headers[$name] = in_array(strtolower($name), self::REDACTED_HEADERS, true)
-                ? self::MASK
-                : $value;
-        }
-
-        return $headers;
-    }
-
-    /**
-     * Mascara recursivamente chaves sensíveis, preservando o restante.
-     *
-     * @param  array<array-key, mixed>  $data
-     * @return array<array-key, mixed>
-     */
-    private function redact(array $data): array
-    {
-        foreach ($data as $key => $value) {
-            if (is_string($key) && in_array(strtolower($key), self::REDACTED_KEYS, true)) {
-                $data[$key] = self::MASK;
-
-                continue;
-            }
-            if (is_array($value)) {
-                $data[$key] = $this->redact($value);
-            }
-        }
-
-        return $data;
-    }
-
-    private function responseSummary(Response $response): array
-    {
-        $content = $response->getContent();
-
-        if ($content === false || $content === '') {
-            return [];
-        }
-
-        // Trabalha sempre sobre cópia do corpo serializado — nunca altera a resposta HTTP.
-        return $this->responseSummarizer->summarize((string) $content);
     }
 }

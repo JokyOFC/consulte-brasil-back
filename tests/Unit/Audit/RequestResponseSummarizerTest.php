@@ -32,7 +32,8 @@ final class RequestResponseSummarizerTest extends TestCase
         $this->assertSame('11144477735', $summary['data']['data']['cpf']);
         $this->assertArrayNotHasKey('certificadoPdfBase64', $summary['data']['data']);
         $this->assertArrayNotHasKey('raw', $summary['data']['data']);
-        $this->assertArrayNotHasKey('_omitted', $summary['data']['data']);
+        $this->assertContains('certificadoPdfBase64', $summary['_audit_omitted']);
+        $this->assertContains('raw', $summary['_audit_omitted']);
     }
 
     public function test_keeps_error_envelope(): void
@@ -67,17 +68,20 @@ final class RequestResponseSummarizerTest extends TestCase
         $this->assertArrayHasKey('raw', $original['data']['data']);
     }
 
-    public function test_summary_stays_under_size_limit(): void
+    public function test_strips_unknown_base64_fields(): void
     {
         $content = json_encode([
             'data' => [
-                'consultation_id' => 'abc',
-                'data' => array_fill_keys(range(1, 500), str_repeat('x', 500)),
+                'data' => [
+                    'nome' => 'ANA',
+                    'arquivoPdfBase64' => str_repeat('X', 50_000),
+                ],
             ],
         ], JSON_THROW_ON_ERROR);
 
         $summary = (new RequestResponseSummarizer)->summarize($content);
 
-        $this->assertLessThanOrEqual(120_000, strlen(json_encode($summary, JSON_THROW_ON_ERROR)));
+        $this->assertSame('ANA', $summary['data']['data']['nome']);
+        $this->assertArrayNotHasKey('arquivoPdfBase64', $summary['data']['data']);
     }
 }

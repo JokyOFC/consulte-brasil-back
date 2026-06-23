@@ -335,6 +335,11 @@ function ProfileCard({ data }: { data: Record<string, unknown> }) {
         Object.entries(data).filter(([key]) => !['nome', 'name', 'cpf', 'cnpj', 'documento', 'endereco'].includes(key)),
     );
 
+    // Campos simples vão na grade compacta; objetos/arrays aninhados são
+    // renderizados recursivamente (senão virariam "[object Object]").
+    const simpleEntries = otherEntries.filter(([, value]) => isPrimitive(value));
+    const complexEntries = otherEntries.filter(([, value]) => !isPrimitive(value));
+
     return (
         <div className="space-y-4">
             <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
@@ -350,10 +355,18 @@ function ProfileCard({ data }: { data: Record<string, unknown> }) {
                 </div>
             </div>
 
-            {otherEntries.length > 0 && (
+            {simpleEntries.length > 0 && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                    {otherEntries.map(([key, value]) => (
+                    {simpleEntries.map(([key, value]) => (
                         <FieldCell key={key} label={humanizeFieldKey(key)} value={formatResultPrimitive(value)} compact />
+                    ))}
+                </div>
+            )}
+
+            {complexEntries.length > 0 && (
+                <div className="space-y-3">
+                    {complexEntries.map(([key, value]) => (
+                        <ResultNode key={key} label={humanizeFieldKey(key)} value={value} depth={1} />
                     ))}
                 </div>
             )}
@@ -367,6 +380,8 @@ function ScoreCard({ data, compact = false }: { data: Record<string, unknown>; c
     const extras = sortResultEntries(
         Object.entries(data).filter(([key]) => !['score', 'pontuacao', 'texto', 'mensagem', 'descricao', 'message'].includes(key)),
     );
+    const simpleExtras = extras.filter(([, value]) => isPrimitive(value));
+    const complexExtras = extras.filter(([, value]) => !isPrimitive(value));
 
     return (
         <div className={cn('rounded-xl border border-brand-green/20 bg-gradient-to-br from-brand-green/10 to-transparent p-4', compact && 'p-3')}>
@@ -383,10 +398,17 @@ function ScoreCard({ data, compact = false }: { data: Record<string, unknown>; c
                     </p>
                 )}
             </div>
-            {extras.length > 0 && (
+            {simpleExtras.length > 0 && (
                 <div className="mt-4 grid gap-2 border-t border-border/50 pt-4 sm:grid-cols-2">
-                    {extras.map(([key, value]) => (
+                    {simpleExtras.map(([key, value]) => (
                         <FieldCell key={key} label={humanizeFieldKey(key)} value={formatResultPrimitive(value)} compact />
+                    ))}
+                </div>
+            )}
+            {complexExtras.length > 0 && (
+                <div className="mt-4 space-y-3 border-t border-border/50 pt-4">
+                    {complexExtras.map(([key, value]) => (
+                        <ResultNode key={key} label={humanizeFieldKey(key)} value={value} depth={1} />
                     ))}
                 </div>
             )}
