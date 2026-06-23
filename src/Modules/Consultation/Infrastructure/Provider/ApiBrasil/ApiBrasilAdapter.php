@@ -114,7 +114,9 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
     /**
      * Converte os params normalizados no body esperado pela APIBrasil:
      *  - mescla o body estático da capability (ex.: { "tipo": "spc-boa-vista" });
-     *  - traduz "document" para a chave esperada (ex.: { "cpf": "111..." });
+     *  - traduz "document" para a chave esperada (ex.: { "cpf": "111..." }),
+     *    HIGIENIZANDO o valor (só alfanumérico, maiúsculo) — bureaus rejeitam
+     *    CPF/CNPJ pontuado com HTTP 400 ("consulta não concluída");
      *  - injeta homolog=true em sandbox (dados fictícios, sem custo real).
      *
      * Params enviados pelo usuário têm prioridade sobre o body estático.
@@ -127,7 +129,7 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
         $params = $request->params;
 
         if ($bodyKey !== null && $bodyKey !== '' && array_key_exists('document', $params)) {
-            $params[$bodyKey] = $params['document'];
+            $params[$bodyKey] = $this->sanitizeDocument((string) $params['document']);
             unset($params['document']);
         }
 
@@ -138,6 +140,16 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
         }
 
         return $body;
+    }
+
+    /**
+     * Remove pontuação do documento (CPF/CNPJ/CEP/placa), mantendo apenas
+     * alfanumérico em maiúsculas — suporta CNPJ alfanumérico (IN RFB 2.229/2024)
+     * e evita o 400 do bureau quando o cliente envia o documento formatado.
+     */
+    private function sanitizeDocument(string $document): string
+    {
+        return strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $document) ?? '');
     }
 
     /**

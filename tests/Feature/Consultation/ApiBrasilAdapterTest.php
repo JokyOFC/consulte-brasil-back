@@ -110,6 +110,22 @@ final class ApiBrasilAdapterTest extends TestCase
         });
     }
 
+    public function test_formatted_document_is_sanitized_before_sending_to_provider(): void
+    {
+        Http::fake([
+            'apibrasil.test/api/v2/cpf' => Http::response([
+                'response' => ['nome' => 'JOÃO DA SILVA'],
+            ], 200),
+        ]);
+
+        // Cliente da API manda o CPF pontuado — o bureau rejeitaria com 400.
+        app(ApiBrasilAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['document' => '035.521.340-00']),
+        );
+
+        Http::assertSent(fn ($request) => $request['cpf'] === '03552134000' && ! isset($request['document']));
+    }
+
     public function test_error_envelope_on_2xx_triggers_failover_so_client_is_not_charged(): void
     {
         Http::fake([
