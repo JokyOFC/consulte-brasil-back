@@ -17,15 +17,23 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class RequestLogRecorder
 {
+    /** Sempre mascarados — credenciais e dados de cartão nunca vão pro log em claro. */
     /** @var list<string> */
     private const REDACTED_KEYS = [
         'password', 'password_confirmation', 'current_password',
         'token', 'secret', 'api_key', 'apikey', 'access_token',
         'device_token', 'sandbox_token', 'bearer',
-        'document', 'cpf', 'cnpj', 'nr_cpf', 'nr_cnpj',
         'card_number', 'cardnumber', 'cvv', 'security_code', 'securitycode',
         'card_token', 'cardtoken', 'card_token_id',
     ];
+
+    /**
+     * Documentos: mascarados por padrão (LGPD), mas podem ser temporariamente
+     * desmascarados para diagnóstico via AUDIT_MASK_DOCUMENTS=false.
+     *
+     * @var list<string>
+     */
+    private const DOCUMENT_KEYS = ['document', 'cpf', 'cnpj', 'nr_cpf', 'nr_cnpj'];
 
     /** @var list<string> */
     private const REDACTED_HEADERS = [
@@ -258,7 +266,7 @@ final class RequestLogRecorder
     private function redact(array $data): array
     {
         foreach ($data as $key => $value) {
-            if (is_string($key) && in_array(strtolower($key), self::REDACTED_KEYS, true)) {
+            if (is_string($key) && $this->shouldRedact($key)) {
                 $data[$key] = self::MASK;
 
                 continue;
@@ -269,5 +277,17 @@ final class RequestLogRecorder
         }
 
         return $data;
+    }
+
+    private function shouldRedact(string $key): bool
+    {
+        $normalized = strtolower($key);
+
+        if (in_array($normalized, self::REDACTED_KEYS, true)) {
+            return true;
+        }
+
+        return in_array($normalized, self::DOCUMENT_KEYS, true)
+            && (bool) config('audit.mask_documents', true);
     }
 }

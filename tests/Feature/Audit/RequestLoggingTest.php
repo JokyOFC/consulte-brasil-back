@@ -100,6 +100,29 @@ final class RequestLoggingTest extends TestCase
         $this->assertSame(402, $log->status_code);
     }
 
+    public function test_document_is_revealed_when_masking_disabled_but_password_stays_masked(): void
+    {
+        config()->set('audit.mask_documents', false);
+
+        ['token' => $token] = $this->provisionApiKey();
+        $this->seed(QueryTypeSeeder::class);
+
+        $this->withToken($token)
+            ->postJson('/api/v1/consult/cpf', [
+                'params' => ['document' => '11144477735'],
+                'password' => 'super-secret',
+            ])
+            ->assertStatus(402);
+
+        $log = RequestLogModel::query()->where('path', '/api/v1/consult/cpf')->first();
+
+        $this->assertNotNull($log);
+        // Documento revelado para diagnóstico…
+        $this->assertSame('11144477735', $log->body['params']['document'] ?? null);
+        // …mas credenciais permanecem SEMPRE mascaradas.
+        $this->assertSame('***', $log->body['password'] ?? null);
+    }
+
     public function test_consultation_api_response_stays_intact_while_log_strips_heavy_fields(): void
     {
         $account = app(CreateAccount::class)->handle(new CreateAccountInput('ACME', '44.555.666/0001-81'));

@@ -137,9 +137,9 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
 
         // Higieniza o documento na chave final SEMPRE — não importa se o cliente
         // mandou em "document" ou direto na chave do provedor ("cpf"/"cnpj"),
-        // formatado ou não. Bureaus rejeitam documento pontuado com HTTP 400.
+        // formatado ou não. Bureaus rejeitam documento pontuado/curto com HTTP 400.
         if ($bodyKey !== null && $bodyKey !== '' && isset($body[$bodyKey]) && is_string($body[$bodyKey])) {
-            $body[$bodyKey] = $this->sanitizeDocument($body[$bodyKey]);
+            $body[$bodyKey] = $this->normalizeDocumentForKey($bodyKey, $body[$bodyKey]);
         }
 
         if ($homolog) {
@@ -157,6 +157,34 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
     private function sanitizeDocument(string $document): string
     {
         return strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $document) ?? '');
+    }
+
+    /**
+     * Higieniza e, para CPF/CNPJ, recupera zeros à esquerda perdidos quando o
+     * cliente envia o documento como número (ex.: 3552134000 → 03552134000).
+     * Só completa quando falta pouco (≤2 dígitos), evitando "inventar" zeros
+     * em entradas claramente erradas.
+     */
+    private function normalizeDocumentForKey(string $bodyKey, string $value): string
+    {
+        $clean = $this->sanitizeDocument($value);
+
+        if (! ctype_digit($clean)) {
+            return $clean;
+        }
+
+        $key = strtolower($bodyKey);
+        $length = strlen($clean);
+
+        if ($key === 'cpf' && $length >= 9 && $length < 11) {
+            return str_pad($clean, 11, '0', STR_PAD_LEFT);
+        }
+
+        if ($key === 'cnpj' && $length >= 12 && $length < 14) {
+            return str_pad($clean, 14, '0', STR_PAD_LEFT);
+        }
+
+        return $clean;
     }
 
     /**

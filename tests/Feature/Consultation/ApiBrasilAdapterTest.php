@@ -143,6 +143,22 @@ final class ApiBrasilAdapterTest extends TestCase
         Http::assertSent(fn ($request) => $request['cpf'] === '03552134000');
     }
 
+    public function test_cpf_missing_leading_zero_is_left_padded_to_11_digits(): void
+    {
+        Http::fake([
+            'apibrasil.test/api/v2/cpf' => Http::response([
+                'response' => ['nome' => 'JOÃO DA SILVA'],
+            ], 200),
+        ]);
+
+        // Integrador enviou o CPF como número, perdendo o zero à esquerda.
+        app(ApiBrasilAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['document' => '3552134000']),
+        );
+
+        Http::assertSent(fn ($request) => $request['cpf'] === '03552134000');
+    }
+
     public function test_error_envelope_on_2xx_triggers_failover_so_client_is_not_charged(): void
     {
         Http::fake([
