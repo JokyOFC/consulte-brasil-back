@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
+import { formatDateTime } from '@/lib/datetime';
 
 interface Stats {
     accounts: number;
@@ -65,6 +66,7 @@ interface Charts {
 
 interface RecentConsultation {
     id: string;
+    account_id: string | null;
     account_name: string | null;
     query_type: string;
     status: string;
@@ -286,8 +288,9 @@ export default function AdminDashboard({ stats, charts, recent }: Props) {
                     </Card>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <QuickLink href="/admin/accounts" title="Clientes" desc="Contas, saldos e ajustes." icon={Users} />
+                    <QuickLink href="/admin/logs" title="Logs de API" desc="Requisições e erros por cliente." icon={Activity} />
                     <QuickLink href="/admin/plans" title="Planos" desc="Catálogo e preços." icon={Layers} />
                     <QuickLink href="/admin/query-types" title="Tipos de consulta" desc="Cache e catálogo." icon={FileSearch} />
                     <QuickLink href="/admin/providers" title="Provedores" desc="Ativação e prioridade." icon={Server} />
@@ -306,18 +309,26 @@ export default function AdminDashboard({ stats, charts, recent }: Props) {
                                     <th className="px-6 py-3 font-medium">Provedor</th>
                                     <th className="px-6 py-3 font-medium">Status</th>
                                     <th className="px-6 py-3 text-right font-medium">Custo</th>
-                                    <th className="px-6 py-3 font-medium">Data</th>
+                                    <th className="px-6 py-3 font-medium">Data (Brasília)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {recent.map((c) => (
                                     <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                        <td className="px-6 py-3 font-medium">{c.account_name ?? '—'}</td>
+                                        <td className="px-6 py-3 font-medium">
+                                            {c.account_id ? (
+                                                <Link href={`/admin/accounts/${c.account_id}`} className="hover:text-primary hover:underline">
+                                                    {c.account_name ?? '—'}
+                                                </Link>
+                                            ) : (
+                                                c.account_name ?? '—'
+                                            )}
+                                        </td>
                                         <td className="px-6 py-3"><Badge variant="secondary" className="uppercase">{c.query_type}</Badge></td>
                                         <td className="px-6 py-3 text-muted-foreground">{c.provider ?? '—'}</td>
                                         <td className="px-6 py-3"><ConsultationStatusBadge status={c.status} /></td>
                                         <td className="px-6 py-3 text-right font-medium">{formatBRL(c.credit_cost)}</td>
-                                        <td className="px-6 py-3 text-muted-foreground">{formatDate(c.created_at)}</td>
+                                        <td className="px-6 py-3 text-muted-foreground">{formatDateTime(c.created_at)}</td>
                                     </tr>
                                 ))}
                                 {recent.length === 0 && (
@@ -363,12 +374,6 @@ function QuickLink({
             </Card>
         </Link>
     );
-}
-
-function formatDate(value: string): string {
-    const d = new Date(value.replace(' ', 'T'));
-
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString('pt-BR');
 }
 
 AdminDashboard.layout = {

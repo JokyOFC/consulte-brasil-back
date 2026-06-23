@@ -50,10 +50,8 @@ export function Pagination({
     );
 }
 
-export function formatDateTime(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
+import { formatDateTime as formatDateTimeBr } from '@/lib/datetime';
 
-    return new Date(iso).toLocaleString('pt-BR');
+export function formatDateTime(iso: string | null): string {
+    return formatDateTimeBr(iso);
 }

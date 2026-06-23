@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,6 +53,7 @@ final class AdminDashboardController extends Controller
                 ->limit(10)
                 ->get([
                     'consultations.id',
+                    'consultations.account_id',
                     'consultations.query_type',
                     'consultations.status',
                     'consultations.credit_cost',
@@ -61,12 +63,15 @@ final class AdminDashboardController extends Controller
                 ])
                 ->map(fn ($r) => [
                     'id' => $r->id,
+                    'account_id' => $r->account_id ?? null,
                     'account_name' => $r->account_name,
                     'query_type' => $r->query_type,
                     'status' => $r->status,
                     'credit_cost' => (int) $r->credit_cost,
                     'provider' => $r->provider,
-                    'created_at' => $r->created_at,
+                    'created_at' => $r->created_at !== null
+                        ? Carbon::parse($r->created_at)->toIso8601String()
+                        : null,
                 ])
                 ->all(),
         ]);

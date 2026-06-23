@@ -21,6 +21,7 @@ use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\Consulta
 use Src\Modules\Identity\Application\DTO\CreateAccountInput;
 use Src\Modules\Identity\Application\UseCase\CreateAccount;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\AccountModel;
+use Illuminate\Support\Carbon;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\ApiKeyModel;
 
 /**
@@ -175,7 +176,9 @@ final class AccountsAdminController
                     'status' => $row->status,
                     'credit_cost' => (int) $row->credit_cost,
                     'provider' => $row->provider,
-                    'created_at' => $row->created_at,
+                    'created_at' => $row->created_at !== null
+                        ? Carbon::parse($row->created_at)->toIso8601String()
+                        : null,
                 ])
                 ->all(),
             'recent_payments' => PaymentModel::query()

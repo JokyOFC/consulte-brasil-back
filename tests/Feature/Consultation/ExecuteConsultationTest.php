@@ -217,6 +217,27 @@ final class ExecuteConsultationTest extends TestCase
         $this->assertSame(2, $provider->callCount);
     }
 
+    public function test_formatted_document_hits_cache_from_digits_only_request(): void
+    {
+        $accountId = $this->seedAccount(credits: 10);
+        $this->seedQueryType('cpf', cost: 3, cacheTtlSeconds: 3600);
+        $this->seedProvider('alpha', priceCents: 3);
+
+        $provider = new FakeProvider('alpha', payload: ['name' => 'João']);
+        $this->tagProvider($provider);
+
+        app(ExecuteConsultation::class)->handle(
+            new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '11144477735']),
+        );
+
+        $cached = app(ExecuteConsultation::class)->handle(
+            new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '111.444.777-35']),
+        );
+
+        $this->assertTrue($cached->fromCache);
+        $this->assertSame(1, $provider->callCount);
+    }
+
     public function test_cache_is_invalidated_automatically_when_query_type_ttl_changes(): void
     {
         $accountId = $this->seedAccount(credits: 20);

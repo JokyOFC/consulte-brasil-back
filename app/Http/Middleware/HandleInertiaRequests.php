@@ -60,6 +60,7 @@ class HandleInertiaRequests extends Middleware
             'adminShell' => fn () => $request->user()?->role === 'admin'
                 ? app(AdminConsumptionOverview::class)->headerPayload()
                 : null,
+            'appTimezone' => config('app.timezone', 'America/Sao_Paulo'),
         ];
     }
 }

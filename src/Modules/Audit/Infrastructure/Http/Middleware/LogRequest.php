@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Src\Modules\Audit\Infrastructure\Http\Support\RequestResponseSummarizer;
 use Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models\RequestLogModel;
+use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -91,9 +92,38 @@ final class LogRequest
             'headers' => $this->sanitizeHeaders($request),
             'body' => $this->redact($request->all()),
             'response' => $responseSummary,
-            'consultation_id' => $responseSummary['data']['consultation_id'] ?? null,
+            'consultation_id' => $this->resolveConsultationId($request, $responseSummary),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $responseSummary
+     */
+    private function resolveConsultationId(Request $request, array $responseSummary): ?string
+    {
+        $fromResponse = $responseSummary['data']['consultation_id'] ?? null;
+        if (is_string($fromResponse) && $fromResponse !== '') {
+            return $fromResponse;
+        }
+
+        if (preg_match('#/api/v1/consult/([^/]+)#', $request->getPathInfo(), $matches) !== 1) {
+            return null;
+        }
+
+        $accountId = $request->user()?->getAuthIdentifier();
+        if (! is_string($accountId)) {
+            return null;
+        }
+
+        $consultationId = ConsultationModel::query()
+            ->where('account_id', $accountId)
+            ->where('query_type', urldecode($matches[1]))
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->orderByDesc('created_at')
+            ->value('id');
+
+        return is_string($consultationId) ? $consultationId : null;
     }
 
     /**

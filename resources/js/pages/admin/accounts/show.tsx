@@ -47,6 +47,7 @@ import { Separator } from '@/components/ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatBRL } from '@/lib/format';
+import { formatDate, formatDateTime } from '@/lib/datetime';
 
 interface Account {
     id: string;
@@ -201,6 +202,11 @@ export default function AdminAccountShow({
                     description={`${account.document_type.toUpperCase()} ${account.document}`}
                     actions={
                         <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={`/admin/logs?account_id=${account.id}`}>
+                                    <KeyRound /> Logs de API
+                                </Link>
+                            </Button>
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={`/admin/finance?account_id=${account.id}`}>
                                     <Wallet /> Financeiro
@@ -371,7 +377,7 @@ export default function AdminAccountShow({
                                 c.provider ?? '—',
                                 <ConsultationStatusBadge key="status" status={c.status} />,
                                 <span key="cost" className="font-medium tabular-nums">{formatBRL(c.credit_cost)}</span>,
-                                formatDate(c.created_at),
+                                formatDateTime(c.created_at),
                             ])}
                         />
                     </CardContent>
@@ -713,17 +719,6 @@ function subscriptionStatusLabel(status: string): string {
     };
 
     return labels[status] ?? status;
-}
-
-function formatDate(value: string | null): string {
-    if (!value) {
-        return '—';
-    }
-
-    const normalized = value.includes('T') ? value : `${value}T12:00:00`;
-    const date = new Date(normalized);
-
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR');
 }
 
 function initials(name: string): string {

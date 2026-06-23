@@ -32,13 +32,7 @@ final class ExecuteConsultationWebRequest extends FormRequest
     /** @return array<string, mixed> */
     public function validatedParams(): array
     {
-        $validated = $this->validated();
-
-        if (isset($validated['document'])) {
-            return ['document' => preg_replace('/\D+/', '', (string) $validated['document']) ?: (string) $validated['document']];
-        }
-
-        return $validated;
+        return $this->validated();
     }
 
     /** @return array<string, string> */
