@@ -129,11 +129,18 @@ final readonly class ApiBrasilAdapter implements DataProviderPort
         $params = $request->params;
 
         if ($bodyKey !== null && $bodyKey !== '' && array_key_exists('document', $params)) {
-            $params[$bodyKey] = $this->sanitizeDocument((string) $params['document']);
+            $params[$bodyKey] = $params['document'];
             unset($params['document']);
         }
 
         $body = array_merge($staticBody, $params);
+
+        // Higieniza o documento na chave final SEMPRE — não importa se o cliente
+        // mandou em "document" ou direto na chave do provedor ("cpf"/"cnpj"),
+        // formatado ou não. Bureaus rejeitam documento pontuado com HTTP 400.
+        if ($bodyKey !== null && $bodyKey !== '' && isset($body[$bodyKey]) && is_string($body[$bodyKey])) {
+            $body[$bodyKey] = $this->sanitizeDocument($body[$bodyKey]);
+        }
 
         if ($homolog) {
             $body['homolog'] = true;

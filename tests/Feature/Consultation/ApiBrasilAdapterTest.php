@@ -126,6 +126,23 @@ final class ApiBrasilAdapterTest extends TestCase
         Http::assertSent(fn ($request) => $request['cpf'] === '03552134000' && ! isset($request['document']));
     }
 
+    public function test_document_sent_directly_under_provider_key_is_also_sanitized(): void
+    {
+        Http::fake([
+            'apibrasil.test/api/v2/cpf' => Http::response([
+                'response' => ['nome' => 'JOÃO DA SILVA'],
+            ], 200),
+        ]);
+
+        // Integrador manda o CPF direto na chave do provedor ("cpf"), pontuado,
+        // sem usar "document" — mesmo assim deve ir limpo para o bureau.
+        app(ApiBrasilAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['cpf' => '035.521.340-00']),
+        );
+
+        Http::assertSent(fn ($request) => $request['cpf'] === '03552134000');
+    }
+
     public function test_error_envelope_on_2xx_triggers_failover_so_client_is_not_charged(): void
     {
         Http::fake([
