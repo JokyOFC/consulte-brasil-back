@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\Dates;
 use App\Models\User;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -69,9 +69,7 @@ final class AdminDashboardController extends Controller
                     'status' => $r->status,
                     'credit_cost' => (int) $r->credit_cost,
                     'provider' => $r->provider,
-                    'created_at' => $r->created_at !== null
-                        ? Carbon::parse($r->created_at)->toIso8601String()
-                        : null,
+                    'created_at' => Dates::toFrontendIso($r->created_at),
                 ])
                 ->all(),
         ]);

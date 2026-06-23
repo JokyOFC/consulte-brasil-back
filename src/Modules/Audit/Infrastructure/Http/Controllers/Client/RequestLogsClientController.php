@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Audit\Infrastructure\Http\Controllers\Client;
 
+use App\Support\Dates;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,7 +51,7 @@ final class RequestLogsClientController
             'body' => $log->body,
             'response' => $log->response,
             'consultation_id' => $log->consultation_id,
-            'created_at' => $log->created_at?->toIso8601String(),
+            'created_at' => Dates::toFrontendIso($log->created_at),
         ]);
 
         return Inertia::render('client/logs/index', [

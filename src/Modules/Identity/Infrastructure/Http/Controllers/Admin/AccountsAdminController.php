@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Identity\Infrastructure\Http\Controllers\Admin;
 
+use App\Support\Dates;
 use App\Models\User;
 use App\Rules\ValidDocument;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,6 @@ use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\Consulta
 use Src\Modules\Identity\Application\DTO\CreateAccountInput;
 use Src\Modules\Identity\Application\UseCase\CreateAccount;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\AccountModel;
-use Illuminate\Support\Carbon;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\ApiKeyModel;
 
 /**
@@ -91,7 +91,7 @@ final class AccountsAdminController
                 'document' => $account->document,
                 'document_type' => $account->document_type,
                 'status' => $account->status,
-                'created_at' => $account->created_at?->toIso8601String(),
+                'created_at' => Dates::toFrontendIso($account->created_at),
             ],
             'wallet' => [
                 'balance' => $wallet?->balance()->value ?? 0,
@@ -141,8 +141,8 @@ final class AccountsAdminController
                     'prefix' => $key->prefix,
                     'last_four' => $key->last_four,
                     'status' => $key->status,
-                    'last_used_at' => $key->last_used_at?->toIso8601String(),
-                    'expires_at' => $key->expires_at?->toIso8601String(),
+                    'last_used_at' => Dates::toFrontendIso($key->last_used_at),
+                    'expires_at' => Dates::toFrontendIso($key->expires_at),
                 ])
                 ->all(),
             'users' => User::query()
@@ -154,7 +154,7 @@ final class AccountsAdminController
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
-                    'created_at' => $user->created_at?->toIso8601String(),
+                    'created_at' => Dates::toFrontendIso($user->created_at),
                 ])
                 ->all(),
             'recent_consultations' => DB::table('consultations')
@@ -176,9 +176,7 @@ final class AccountsAdminController
                     'status' => $row->status,
                     'credit_cost' => (int) $row->credit_cost,
                     'provider' => $row->provider,
-                    'created_at' => $row->created_at !== null
-                        ? Carbon::parse($row->created_at)->toIso8601String()
-                        : null,
+                    'created_at' => Dates::toFrontendIso($row->created_at),
                 ])
                 ->all(),
             'recent_payments' => PaymentModel::query()
@@ -192,8 +190,8 @@ final class AccountsAdminController
                     'method' => $payment->method,
                     'status' => $payment->status,
                     'amount_cents' => (int) $payment->amount_cents,
-                    'created_at' => $payment->created_at?->toIso8601String(),
-                    'paid_at' => $payment->paid_at?->toIso8601String(),
+                    'created_at' => Dates::toFrontendIso($payment->created_at),
+                    'paid_at' => Dates::toFrontendIso($payment->paid_at),
                 ])
                 ->all(),
             'credit_transactions' => CreditTransactionModel::query()
@@ -207,7 +205,7 @@ final class AccountsAdminController
                     'direction' => $tx->direction,
                     'amount' => (int) $tx->amount,
                     'balance_after' => (int) $tx->balance_after,
-                    'created_at' => $tx->created_at?->toIso8601String(),
+                    'created_at' => Dates::toFrontendIso($tx->created_at),
                 ])
                 ->all(),
             'plans' => array_map(fn ($p) => [

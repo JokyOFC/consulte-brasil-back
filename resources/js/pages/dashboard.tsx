@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePageFlash } from '@/hooks/use-page-flash';
-import { formatBRL } from '@/lib/format';
+import { formatDateTime } from '@/lib/datetime';
 import { dashboard } from '@/routes';
 
 interface Wallet {
@@ -143,7 +143,7 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
                                         <td className="px-6 py-3 text-muted-foreground">{c.provider ?? '—'}</td>
                                         <td className="px-6 py-3"><ConsultationStatusBadge status={c.status} /></td>
                                         <td className="px-6 py-3 text-right font-medium">{formatBRL(c.credit_cost)}</td>
-                                        <td className="px-6 py-3 text-muted-foreground">{formatDate(c.created_at)}</td>
+                                        <td className="px-6 py-3 text-muted-foreground">{formatDateTime(c.created_at)}</td>
                                     </tr>
                                 ))}
                                 {recent.length === 0 && (
@@ -223,12 +223,6 @@ function formatChartDay(isoDate: string): string {
     }
 
     return `${parts[2]}/${parts[1]}`;
-}
-
-function formatDate(value: string): string {
-    const d = new Date(value.replace(' ', 'T'));
-
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString('pt-BR');
 }
 
 Dashboard.layout = {

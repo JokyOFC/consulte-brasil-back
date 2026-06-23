@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { formatDateTime as formatDateTimeBr } from '@/lib/datetime';
 
 export interface Paginator<T> {
     data: T[];
@@ -8,6 +9,21 @@ export interface Paginator<T> {
     total: number;
     from: number | null;
     to: number | null;
+}
+
+/** Rótulos do paginator Laravel → texto legível (fallback se tradução faltar). */
+function formatLinkLabel(label: string): string {
+    const normalized = label.trim();
+
+    if (normalized === 'pagination.previous') {
+        return '« Anterior';
+    }
+
+    if (normalized === 'pagination.next') {
+        return 'Próximo »';
+    }
+
+    return label;
 }
 
 export function Pagination({
@@ -25,32 +41,33 @@ export function Pagination({
                 Mostrando {paginator.from ?? 0}–{paginator.to ?? 0} de {paginator.total}
             </p>
             <div className="flex flex-wrap gap-1">
-                {paginator.links.map((link, i) =>
-                    link.url ? (
+                {paginator.links.map((link, i) => {
+                    const label = formatLinkLabel(link.label);
+                    const className = `rounded-md px-3 py-1.5 text-sm ${
+                        link.active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'
+                    }`;
+
+                    return link.url ? (
                         <Link
                             key={i}
                             href={link.url}
                             preserveState
                             replace
-                            className={`rounded-md px-3 py-1.5 text-sm ${
-                                link.active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'
-                            }`}
-                            dangerouslySetInnerHTML={{ __html: link.label }}
+                            className={className}
+                            dangerouslySetInnerHTML={{ __html: label }}
                         />
                     ) : (
                         <span
                             key={i}
                             className="rounded-md px-3 py-1.5 text-sm text-muted-foreground/40"
-                            dangerouslySetInnerHTML={{ __html: link.label }}
+                            dangerouslySetInnerHTML={{ __html: label }}
                         />
-                    ),
-                )}
+                    );
+                })}
             </div>
         </div>
     );
 }
-
-import { formatDateTime as formatDateTimeBr } from '@/lib/datetime';
 
 export function formatDateTime(iso: string | null): string {
     return formatDateTimeBr(iso);

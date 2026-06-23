@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Audit\Infrastructure\Http\Support;
 
+use App\Support\Dates;
 use Illuminate\Support\Carbon;
 use Src\Modules\Audit\Infrastructure\Persistence\Eloquent\Models\RequestLogModel;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
@@ -59,7 +60,7 @@ final class RequestLogPresenter
             'error_type' => $meta['error_type'],
             'error_message' => $meta['error_message'],
             'response_truncated' => $meta['response_truncated'],
-            'created_at' => $log->created_at?->toIso8601String(),
+            'created_at' => Dates::toFrontendIso($log->created_at),
         ];
     }
 

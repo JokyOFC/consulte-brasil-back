@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\Dates;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -121,7 +122,7 @@ final class DashboardController extends Controller
                 'status' => $r->status,
                 'credit_cost' => (int) $r->credit_cost,
                 'provider' => $r->provider,
-                'created_at' => $r->created_at,
+                'created_at' => Dates::toFrontendIso($r->created_at),
             ])
             ->all();
     }

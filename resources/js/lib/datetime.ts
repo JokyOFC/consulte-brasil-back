@@ -53,8 +53,8 @@ export function formatDate(value: string | null | undefined): string {
 
 function parseAppDateTime(value: string): Date {
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-        // Datetime MySQL sem offset: interpreta como horário de Brasília.
-        return new Date(value.replace(' ', 'T') + '-03:00');
+        // Strings MySQL cruas (DB::table) vêm em UTC no Laravel.
+        return new Date(value.replace(' ', 'T') + 'Z');
     }
 
     return new Date(value);
