@@ -6,13 +6,13 @@ namespace App\Http\Controllers;
 
 use App\Support\Dates;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\CreditTransactionModel;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\ApiKeyModel;
+use Src\Modules\Provider\Infrastructure\Persistence\Eloquent\Models\ProviderModel;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
@@ -83,7 +83,7 @@ final class DashboardController extends Controller
                 ->where('status', 'success')
                 ->where('created_at', '>=', now()->subDays(6)->startOfDay())
                 ->get(['created_at'])
-                ->groupBy(fn ($c) => $c->created_at->format('Y-m-d'))
+                ->groupBy(fn ($c) => $c->created_at->timezone(Dates::displayTimezone())->format('Y-m-d'))
                 ->map->count();
         }
 
@@ -103,26 +103,24 @@ final class DashboardController extends Controller
             return [];
         }
 
-        return DB::table('consultations')
-            ->leftJoin('providers', 'consultations.provider_id', '=', 'providers.id')
-            ->where('consultations.account_id', $accountId)
-            ->orderByDesc('consultations.created_at')
+        $consultations = ConsultationModel::query()
+            ->where('account_id', $accountId)
+            ->orderByDesc('created_at')
             ->limit(8)
-            ->get([
-                'consultations.id',
-                'consultations.query_type',
-                'consultations.status',
-                'consultations.credit_cost',
-                'consultations.created_at',
-                'providers.identifier as provider',
-            ])
-            ->map(fn ($r) => [
-                'id' => $r->id,
-                'query_type' => $r->query_type,
-                'status' => $r->status,
-                'credit_cost' => (int) $r->credit_cost,
-                'provider' => $r->provider,
-                'created_at' => Dates::toFrontendIso($r->created_at),
+            ->get();
+
+        $providers = ProviderModel::query()
+            ->whereIn('id', $consultations->pluck('provider_id')->filter()->unique()->all())
+            ->pluck('identifier', 'id');
+
+        return $consultations
+            ->map(fn (ConsultationModel $consultation) => [
+                'id' => $consultation->id,
+                'query_type' => $consultation->query_type,
+                'status' => $consultation->status,
+                'credit_cost' => (int) $consultation->credit_cost,
+                'provider' => $providers[$consultation->provider_id] ?? null,
+                'created_at' => Dates::toFrontendIso($consultation->created_at),
             ])
             ->all();
     }

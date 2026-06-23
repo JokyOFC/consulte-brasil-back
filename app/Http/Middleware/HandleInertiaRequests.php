@@ -61,6 +61,7 @@ class HandleInertiaRequests extends Middleware
                 ? app(AdminConsumptionOverview::class)->headerPayload()
                 : null,
             'appTimezone' => config('app.timezone', 'America/Sao_Paulo'),
+            'appDisplayTimezone' => config('app.display_timezone', 'America/Sao_Paulo'),
         ];
     }
 }

@@ -81,6 +81,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Fuso usado nas telas (logs, consultas recentes, dashboards). Separado de
+    | APP_TIMEZONE para que produção possa rodar UTC internamente e ainda
+    | exibir horário de Brasília ao usuário.
+    |
+    */
+
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'America/Sao_Paulo'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

@@ -10,27 +10,56 @@ use DateTimeInterface;
 /**
  * Serializa timestamps para o frontend (Inertia/API).
  *
- * O MySQL guarda timestamps em UTC. Consultas via DB::table() devolvem a
- * string crua — Carbon::parse() sem fuso assume o timezone da app e erra 3h.
- * Eloquent com cast datetime já devolve o instante correto; este helper unifica
- * os dois casos num ISO 8601 no fuso configurado (America/Sao_Paulo).
+ * O MySQL persiste instantes em UTC (via TIMESTAMP ou gravação Laravel).
+ * A string lida do banco reflete o fuso da sessão PDO; parseStoredTimestamp()
+ * normaliza para UTC antes de converter para display_timezone na serialização.
  */
 final class Dates
 {
-    public static function toFrontendIso(DateTimeInterface|string|null $value): ?string
+    public static function displayTimezone(): string
+    {
+        return (string) config('app.display_timezone', 'America/Sao_Paulo');
+    }
+
+    public static function toFrontendIso(DateTimeInterface|string|null $value, ?string $connection = null): ?string
     {
         if ($value === null || $value === '') {
             return null;
         }
 
+        return self::parseStoredTimestamp($value, $connection)
+            ->timezone(self::displayTimezone())
+            ->toIso8601String();
+    }
+
+    /**
+     * Interpreta valor vindo do banco (string na sessão PDO ou Carbon) como instante UTC.
+     */
+    public static function parseStoredTimestamp(DateTimeInterface|string $value, ?string $connection = null): Carbon
+    {
         if ($value instanceof DateTimeInterface) {
-            return Carbon::instance($value)
-                ->timezone(config('app.timezone'))
-                ->toIso8601String();
+            return Carbon::instance($value)->utc();
         }
 
-        return Carbon::parse((string) $value, 'UTC')
-            ->timezone(config('app.timezone'))
-            ->toIso8601String();
+        $string = (string) $value;
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $string) === 1) {
+            return Carbon::createFromFormat('Y-m-d H:i:s', $string, self::databaseTimezone($connection))->utc();
+        }
+
+        return Carbon::parse($string)->utc();
+    }
+
+    /** Fuso configurado na conexão PDO (MySQL SET time_zone). */
+    public static function databaseTimezone(?string $connection = null): string
+    {
+        $connection ??= (string) config('database.default');
+        $configured = config("database.connections.{$connection}.timezone");
+
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        return '+00:00';
     }
 }

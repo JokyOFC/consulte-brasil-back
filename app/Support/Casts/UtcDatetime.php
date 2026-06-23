@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Casts;
 
+use App\Support\Dates;
 use Carbon\Carbon;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
@@ -11,9 +12,9 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Timestamps gravados em UTC no MySQL e expostos no fuso da aplicação.
  *
- * O cast datetime padrão do Eloquent interpreta a string do banco como horário
- * local (app.timezone), mas o MySQL/Laravel persistem em UTC — isso deslocava
- * as datas em 3h (ex.: logs de API no painel do cliente).
+ * Colunas TIMESTAMP do MySQL devolvem a string no fuso da sessão PDO
+ * (config database.connections.*.timezone). O cast normaliza para UTC
+ * na leitura; a exibição fica a cargo de Dates::toFrontendIso().
  */
 final class UtcDatetime implements CastsAttributes
 {
@@ -23,7 +24,7 @@ final class UtcDatetime implements CastsAttributes
             return null;
         }
 
-        return Carbon::parse((string) $value, 'UTC')->timezone(config('app.timezone'));
+        return Dates::parseStoredTimestamp((string) $value, $model->getConnectionName());
     }
 
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string

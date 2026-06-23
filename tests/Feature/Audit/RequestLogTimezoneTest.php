@@ -17,7 +17,10 @@ final class RequestLogTimezoneTest extends TestCase
 
     public function test_request_log_created_at_serializes_in_brasilia(): void
     {
-        config(['app.timezone' => 'America/Sao_Paulo']);
+        config([
+            'app.timezone' => 'UTC',
+            'app.display_timezone' => 'America/Sao_Paulo',
+        ]);
 
         Carbon::setTestNow(Carbon::parse('2026-06-22 23:37:28', 'America/Sao_Paulo'));
 
@@ -33,6 +36,6 @@ final class RequestLogTimezoneTest extends TestCase
         $log = RequestLogModel::query()->firstOrFail();
         $iso = Dates::toFrontendIso($log->created_at);
 
-        $this->assertStringContainsString('2026-06-22T23:37:28', $iso);
+        $this->assertSame('2026-06-22T23:37:28-03:00', $iso);
     }
 }

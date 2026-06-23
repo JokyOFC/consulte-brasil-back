@@ -84,7 +84,7 @@ export default function ClientLogsIndex() {
                         <table className="w-full text-sm">
                             <thead className="text-left text-muted-foreground">
                                 <tr className="border-b border-border">
-                                    <th className="px-4 py-3 font-medium">Data</th>
+                                    <th className="px-4 py-3 font-medium">Data (Brasília)</th>
                                     <th className="px-4 py-3 font-medium">Requisição</th>
                                     <th className="px-4 py-3 font-medium">Status</th>
                                     <th className="px-4 py-3 text-right font-medium">Latência</th>

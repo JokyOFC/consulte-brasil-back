@@ -10,32 +10,54 @@ use Tests\TestCase;
 
 final class DatesTest extends TestCase
 {
-    protected function setUp(): void
+    public function test_raw_mysql_utc_string_is_converted_to_brasilia_even_when_app_timezone_is_utc(): void
     {
-        parent::setUp();
+        config([
+            'app.timezone' => 'UTC',
+            'app.display_timezone' => 'America/Sao_Paulo',
+            'database.connections.sqlite.timezone' => '+00:00',
+        ]);
 
-        config(['app.timezone' => 'America/Sao_Paulo']);
-    }
-
-    public function test_raw_mysql_utc_string_is_converted_to_brasilia_iso(): void
-    {
         $iso = Dates::toFrontendIso('2026-06-23 02:37:28');
 
-        $this->assertSame(
-            Carbon::parse('2026-06-23 02:37:28', 'UTC')
-                ->timezone('America/Sao_Paulo')
-                ->toIso8601String(),
-            $iso,
-        );
+        $this->assertSame('2026-06-22T23:37:28-03:00', $iso);
     }
 
-    public function test_datetime_interface_uses_app_timezone(): void
+    public function test_datetime_interface_normalizes_via_utc_instant(): void
     {
+        config([
+            'app.timezone' => 'UTC',
+            'app.display_timezone' => 'America/Sao_Paulo',
+            'database.connections.sqlite.timezone' => '+00:00',
+        ]);
+
         $instant = Carbon::parse('2026-06-23 02:37:28', 'UTC');
 
-        $iso = Dates::toFrontendIso($instant);
+        $this->assertSame('2026-06-22T23:37:28-03:00', Dates::toFrontendIso($instant));
+    }
 
-        $this->assertStringContainsString('-03:00', $iso);
-        $this->assertStringContainsString('T23:37:28', $iso);
+    public function test_iso_without_offset_is_treated_as_utc_on_frontend_parse(): void
+    {
+        config([
+            'app.display_timezone' => 'America/Sao_Paulo',
+            'database.connections.sqlite.timezone' => '+00:00',
+        ]);
+
+        $iso = Dates::toFrontendIso('2026-06-23 02:37:28');
+
+        $this->assertStringContainsString('2026-06-22T23:37:28', $iso);
+    }
+
+    public function test_raw_mysql_string_in_sao_paulo_session_serializes_to_brasilia(): void
+    {
+        config([
+            'app.display_timezone' => 'America/Sao_Paulo',
+            'database.connections.sqlite.timezone' => '-03:00',
+        ]);
+
+        $this->assertSame(
+            '2026-06-22T23:37:28-03:00',
+            Dates::toFrontendIso('2026-06-22 23:37:28'),
+        );
     }
 }

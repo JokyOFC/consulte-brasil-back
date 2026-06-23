@@ -1,4 +1,4 @@
-/** Fuso horário padrão da aplicação (Brasil). */
+/** Fuso de exibição para o usuário (Brasil). Deve coincidir com APP_DISPLAY_TIMEZONE no backend. */
 export const APP_TIMEZONE = 'America/Sao_Paulo';
 
 const BR_DATETIME: Intl.DateTimeFormatOptions = {
@@ -9,6 +9,7 @@ const BR_DATETIME: Intl.DateTimeFormatOptions = {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    hour12: false,
 };
 
 const BR_DATE: Intl.DateTimeFormatOptions = {
@@ -20,7 +21,7 @@ const BR_DATE: Intl.DateTimeFormatOptions = {
 
 /**
  * Formata data/hora no fuso de Brasília.
- * Aceita ISO 8601 ou datetime MySQL (`YYYY-MM-DD HH:mm:ss`) vindo do backend.
+ * Aceita ISO 8601 (com ou sem offset) ou datetime MySQL UTC.
  */
 export function formatDateTime(value: string | null | undefined): string {
     if (!value) {
@@ -52,9 +53,14 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 function parseAppDateTime(value: string): Date {
+    // MySQL UTC: "2026-06-23 02:37:28"
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-        // Strings MySQL cruas (DB::table) vêm em UTC no Laravel.
         return new Date(value.replace(' ', 'T') + 'Z');
+    }
+
+    // ISO sem offset (ex.: "2026-06-23T02:37:28") → tratar como UTC, não como local do browser
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)) {
+        return new Date(`${value}Z`);
     }
 
     return new Date(value);
