@@ -129,6 +129,35 @@ final class ConsultEndpointTest extends TestCase
             ->assertJsonPath('error.type', 'all_providers_failed');
     }
 
+    public function test_consult_endpoint_returns_422_for_invalid_cpf(): void
+    {
+        ['token' => $token, 'accountId' => $accountId] = $this->provisionClient(credits: 10);
+        $this->seedQueryType('cpf', cost: 2);
+        $this->seedProvider('alpha', priceCents: 2);
+        $this->tagProvider(new FakeProvider('alpha', payload: ['name' => 'Maria']));
+
+        $this->withToken($token)
+            ->postJson('/api/v1/consult/cpf', ['params' => ['document' => '12345678900']])
+            ->assertStatus(422)
+            ->assertJsonPath('error.type', 'invalid_document');
+
+        // Documento inválido não pode gerar consulta nem cobrar crédito.
+        $this->assertDatabaseMissing('consultations', ['account_id' => $accountId]);
+    }
+
+    public function test_consult_endpoint_returns_422_for_invalid_cnpj(): void
+    {
+        ['token' => $token] = $this->provisionClient(credits: 10);
+        $this->seedQueryType('cnpj', cost: 2);
+        $this->seedProvider('alpha', queryType: 'cnpj', priceCents: 2);
+        $this->tagProvider(new FakeProvider('alpha', payload: ['name' => 'ACME']));
+
+        $this->withToken($token)
+            ->postJson('/api/v1/consult/cnpj', ['params' => ['document' => '11222333000100']])
+            ->assertStatus(422)
+            ->assertJsonPath('error.type', 'invalid_document');
+    }
+
     public function test_consult_endpoint_returns_404_for_unknown_query_type(): void
     {
         ['token' => $token] = $this->provisionClient(credits: 5);

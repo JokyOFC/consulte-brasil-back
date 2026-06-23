@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Src\Modules\Audit\Infrastructure\Http\Middleware\LogRequest;
 use Src\Modules\Billing\Domain\Exception\InsufficientCredits;
 use Src\Modules\Consultation\Domain\Exception\AllProvidersFailed;
+use Src\Modules\Consultation\Domain\Exception\InvalidDocument;
 use Src\Modules\Consultation\Domain\Exception\NoProviderAvailable;
 use Src\Modules\Consultation\Domain\Exception\UnknownQueryType;
 use Src\Shared\Domain\Exception\DomainException;
@@ -58,6 +59,14 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Tradução das exceções de domínio → códigos HTTP + envelope padronizado.
+
+        // Documento inválido (CPF/CNPJ) → 422 com mensagem amigável ao usuário.
+        $exceptions->render(function (InvalidDocument $e, Request $request): ?JsonResponse {
+            return $request->is('api/*')
+                ? response()->json(['error' => ['type' => 'invalid_document', 'message' => $e->userMessage]], 422)
+                : null;
+        });
+
         $exceptions->render(function (InsufficientCredits $e, Request $request): ?JsonResponse {
             return $request->is('api/*')
                 ? response()->json(['error' => ['type' => 'insufficient_credits', 'message' => $e->getMessage()]], 402)

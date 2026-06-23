@@ -173,7 +173,7 @@ final class ExecuteConsultationTest extends TestCase
         $this->expectException(NoProviderAvailable::class);
 
         app(ExecuteConsultation::class)->handle(
-            new ExecuteConsultationInput($accountId, null, 'cpf', [])
+            new ExecuteConsultationInput($accountId, null, 'cpf', ['document' => '11144477735'])
         );
     }
 

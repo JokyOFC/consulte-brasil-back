@@ -15,6 +15,7 @@ use Src\Modules\Consultation\Application\DTO\ExecuteConsultationInput;
 use Src\Modules\Consultation\Application\Service\ClientConsultationCatalog;
 use Src\Modules\Consultation\Application\UseCase\ExecuteConsultation;
 use Src\Modules\Consultation\Domain\Exception\AllProvidersFailed;
+use Src\Modules\Consultation\Domain\Exception\InvalidDocument;
 use Src\Modules\Consultation\Domain\Exception\NoProviderAvailable;
 use Src\Modules\Consultation\Domain\Exception\UnknownQueryType;
 use Src\Modules\Consultation\Infrastructure\Http\Requests\ExecuteConsultationWebRequest;
@@ -63,6 +64,21 @@ final class ConsultationsClientController
                 queryType: $queryType,
                 params: $request->validatedParams(),
             ));
+        } catch (InvalidDocument $e) {
+            $this->logWebConsultation(
+                $request,
+                $queryType,
+                $startedAt,
+                422,
+                false,
+                $body,
+                ['error' => ['type' => 'invalid_document', 'message' => $e->userMessage]],
+            );
+
+            return redirect()
+                ->route('client.consultations.index')
+                ->with('error', $e->userMessage)
+                ->with('selected_query_type', $queryType);
         } catch (InsufficientCredits) {
             $this->logWebConsultation(
                 $request,

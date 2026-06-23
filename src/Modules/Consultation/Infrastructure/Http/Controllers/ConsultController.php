@@ -59,7 +59,7 @@ final class ConsultController
         ]],
     )]
     #[Response(status: 402, description: 'Saldo insuficiente na carteira')]
-    #[Response(status: 422, description: 'Tipo de consulta inválido ou parâmetros incorretos')]
+    #[Response(status: 422, description: 'Parâmetros incorretos ou documento inválido (ex.: CPF/CNPJ com dígito verificador incorreto)')]
     #[Response(status: 503, description: 'Nenhum provedor disponível para o tipo solicitado')]
     public function __invoke(
         string $queryType,

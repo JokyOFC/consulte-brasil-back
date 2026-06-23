@@ -13,6 +13,7 @@ use Src\Modules\Consultation\Application\DTO\ExecuteConsultationInput;
 use Src\Modules\Consultation\Application\DTO\ExecuteConsultationOutput;
 use Src\Modules\Consultation\Application\Port\ConsultationResultCache;
 use Src\Modules\Consultation\Application\Service\ConsultationParamsNormalizer;
+use Src\Modules\Consultation\Application\Service\ConsultationParamsValidator;
 use Src\Modules\Consultation\Application\Service\ProviderRouter;
 use Src\Modules\Consultation\Domain\Entity\Consultation;
 use Src\Modules\Consultation\Domain\Event\ConsultationCompleted;
@@ -54,6 +55,7 @@ final readonly class ExecuteConsultation
         private ProviderRegistry $registry,
         private CachedConsultationResultEnricher $cachedResultEnricher,
         private ConsultationParamsNormalizer $paramsNormalizer,
+        private ConsultationParamsValidator $paramsValidator,
         private IdGenerator $ids,
         private Clock $clock,
         private EventBus $events,
@@ -67,7 +69,13 @@ final readonly class ExecuteConsultation
             throw UnknownQueryType::withCode($type->code);
         }
 
-        $request = new ConsultationRequest($type, $this->paramsNormalizer->normalize($input->params));
+        $params = $this->paramsNormalizer->normalize($input->params);
+
+        // Rejeita CPF/CNPJ inválido ANTES de reservar crédito ou chamar o
+        // provedor: lança InvalidDocument → HTTP 422 (não 503).
+        $this->paramsValidator->validate($type, $params);
+
+        $request = new ConsultationRequest($type, $params);
         $fingerprint = $request->fingerprint();
         $cacheScope = $this->resolveCacheScope($type);
         $cacheTtl = $this->catalog->cacheTtlSeconds($type);
