@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePageFlash } from '@/hooks/use-page-flash';
 import { formatDateTime } from '@/lib/datetime';
+import { formatBRL } from '@/lib/format';
 import { dashboard } from '@/routes';
 
 interface Wallet {
