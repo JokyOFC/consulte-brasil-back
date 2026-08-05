@@ -19,6 +19,7 @@ final class EloquentInvoiceRepository implements InvoiceRepository
         InvoiceModel::query()->updateOrCreate(
             ['id' => $invoice->id],
             [
+                'number' => $invoice->number,
                 'account_id' => $invoice->accountId,
                 'subscription_id' => $invoice->subscriptionId,
                 'status' => $invoice->status->value,
@@ -79,6 +80,7 @@ final class EloquentInvoiceRepository implements InvoiceRepository
             items: $items,
             metadata: $m->metadata ?? [],
             createdAt: $m->created_at ? new DateTimeImmutable($m->created_at->toDateTimeString()) : null,
+            number: $m->number,
         );
     }
 }

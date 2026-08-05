@@ -8,6 +8,7 @@ use Src\Modules\Billing\Application\DTO\PayInvoiceInput;
 use Src\Modules\Billing\Application\DTO\SubscribeToPlanInput;
 use Src\Modules\Billing\Application\Gateway\GatewayPreapprovalInput;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Application\Service\InvoiceNumberGenerator;
 use Src\Modules\Billing\Domain\Entity\Invoice;
 use Src\Modules\Billing\Domain\Entity\InvoiceItem;
 use Src\Modules\Billing\Domain\Entity\Subscription;
@@ -40,6 +41,7 @@ final readonly class SubscribeToPlan
         private InvoiceRepository $invoices,
         private PaymentGateway $gateway,
         private PayInvoice $payInvoice,
+        private InvoiceNumberGenerator $invoiceNumbers,
         private IdGenerator $ids,
         private Clock $clock,
     ) {}
@@ -112,7 +114,9 @@ final readonly class SubscribeToPlan
             periodStart: $now,
             periodEnd: $next,
             items: [new InvoiceItem($this->ids->generate(), "Plano {$plan->name}", $amountCents)],
+            metadata: ['origin' => 'subscribe'],
             createdAt: $now,
+            number: $this->invoiceNumbers->next(),
         );
         $this->invoices->save($invoice);
 

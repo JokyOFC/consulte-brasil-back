@@ -12,6 +12,7 @@ use Src\Modules\Billing\Infrastructure\Http\Controllers\Admin\PlansAdminControll
 use Src\Modules\Consultation\Infrastructure\Http\Controllers\Admin\QueryTypesAdminController;
 use Src\Modules\Identity\Infrastructure\Http\Controllers\Admin\AccountsAdminController;
 use Src\Modules\Provider\Infrastructure\Http\Controllers\Admin\ProvidersAdminController;
+use Src\Modules\Support\Infrastructure\Http\Controllers\Admin\SupportTicketAdminController;
 
 Route::middleware(['auth', 'verified', 'role:admin', 'throttle:60,1'])
     ->prefix('admin')
@@ -56,6 +57,12 @@ Route::middleware(['auth', 'verified', 'role:admin', 'throttle:60,1'])
         // Tipos de consulta
         Route::get('/query-types', [QueryTypesAdminController::class, 'index'])->name('query-types.index');
         Route::put('/query-types/{queryTypeId}', [QueryTypesAdminController::class, 'update'])->name('query-types.update');
+
+        // Tickets de suporte
+        Route::get('/tickets', [SupportTicketAdminController::class, 'index'])->name('tickets.index');
+        Route::get('/tickets/{ticket}', [SupportTicketAdminController::class, 'show'])->name('tickets.show');
+        Route::patch('/tickets/{ticket}', [SupportTicketAdminController::class, 'update'])->name('tickets.update');
+        Route::post('/tickets/{ticket}/reply', [SupportTicketAdminController::class, 'reply'])->name('tickets.reply');
 
         // Logs de requisições (auditoria)
         Route::get('/logs', [RequestLogsAdminController::class, 'index'])->name('logs.index');

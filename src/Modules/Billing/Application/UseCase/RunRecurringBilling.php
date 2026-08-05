@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Modules\Billing\Application\UseCase;
 
+use Src\Modules\Billing\Application\Service\InvoiceNumberGenerator;
 use Src\Modules\Billing\Domain\Entity\Invoice;
 use Src\Modules\Billing\Domain\Entity\InvoiceItem;
 use Src\Modules\Billing\Domain\Repository\InvoiceRepository;
@@ -29,6 +30,8 @@ final readonly class RunRecurringBilling
     public function __construct(
         private SubscriptionRepository $subscriptions,
         private InvoiceRepository $invoices,
+        private InvoiceNumberGenerator $invoiceNumbers,
+        private EnsureRenewalInvoices $ensureRenewals,
         private IdGenerator $ids,
         private Clock $clock,
     ) {}
@@ -63,18 +66,31 @@ final readonly class RunRecurringBilling
             $amount = (int) $plan->price_cents;
             $periodEnd = $now->modify('+30 days');
 
+            // Se já existe fatura em aberto (ex.: renovação antecipada ainda no prazo),
+            // não duplica. Overdue do ciclo anterior NÃO bloqueia.
+            $hasOpen = InvoiceModel::query()
+                ->where('subscription_id', $sub->id)
+                ->where('status', InvoiceStatus::Open->value)
+                ->exists();
+
+            if ($hasOpen) {
+                continue;
+            }
+
             $invoice = new Invoice(
                 id: $this->ids->generate(),
                 accountId: $sub->account_id,
                 subscriptionId: $sub->id,
                 status: InvoiceStatus::Open,
                 amountCents: $amount,
-                description: "Plano {$plan->name}",
+                description: "Renovação — Plano {$plan->name}",
                 dueDate: $now->modify('+3 days'),
                 periodStart: $now,
                 periodEnd: $periodEnd,
                 items: [new InvoiceItem($this->ids->generate(), "Plano {$plan->name}", $amount)],
+                metadata: ['origin' => 'renewal'],
                 createdAt: $now,
+                number: $this->invoiceNumbers->next(),
             );
             $this->invoices->save($invoice);
 
@@ -90,6 +106,12 @@ final readonly class RunRecurringBilling
             $generated++;
         }
 
-        return ['overdue' => $overdue, 'invoices_generated' => $generated];
+        // Garante fatura de renovação antecipada para planos manuais ainda no prazo.
+        $ensured = $this->ensureRenewals->handle();
+
+        return [
+            'overdue' => $overdue,
+            'invoices_generated' => $generated + $ensured,
+        ];
     }
 }

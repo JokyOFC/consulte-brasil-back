@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { FileSearch, FileText, KeyRound, Layers, LayoutGrid, ScrollText, Search, Server, Settings, Users, Wallet, Webhook } from 'lucide-react';
+import { FileSearch, FileText, Headset, KeyRound, Layers, LayoutGrid, Receipt, ScrollText, Search, Server, Settings, Users, Wallet, Webhook } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -19,6 +19,8 @@ const clientNav: NavItem[] = [
     { title: 'Painel', href: '/dashboard', icon: LayoutGrid },
     { title: 'Consultas', href: '/client/consultations', icon: Search },
     { title: 'Financeiro', href: '/client/billing', icon: Wallet },
+    { title: 'Minhas Faturas', href: '/client/invoices', icon: Receipt },
+    { title: 'Suporte / Chamados', href: '/client/tickets', icon: Headset },
     { title: 'Minhas chaves', href: '/client/api-keys', icon: KeyRound },
     { title: 'Webhook', href: '/client/webhook', icon: Webhook },
     { title: 'Logs', href: '/client/logs', icon: ScrollText },
@@ -29,6 +31,7 @@ const adminNav: NavItem[] = [
     { title: 'Clientes', href: '/admin/accounts', icon: Users },
     { title: 'Financeiro', href: '/admin/finance', icon: Wallet },
     { title: 'Planos', href: '/admin/plans', icon: Layers },
+    { title: 'Tickets de suporte', href: '/admin/tickets', icon: Headset },
     { title: 'Tipos de consulta', href: '/admin/query-types', icon: FileSearch },
     { title: 'Provedores', href: '/admin/providers', icon: Server },
     { title: 'Logs', href: '/admin/logs', icon: ScrollText },
@@ -40,9 +43,15 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-    const page = usePage<{ auth: { user: { role?: string } | null } }>();
+    const page = usePage<{
+        auth: { user: { role?: string } | null };
+        unread_support_tickets?: number;
+    }>();
     const isAdmin = page.props.auth?.user?.role === 'admin';
-    const mainNavItems = isAdmin ? adminNav : clientNav;
+    const unread = page.props.unread_support_tickets ?? 0;
+    const mainNavItems = (isAdmin ? adminNav : clientNav).map((item) =>
+        item.href.endsWith('/tickets') ? { ...item, badge: unread } : item,
+    );
     const homeHref = isAdmin ? '/admin' : '/dashboard';
 
     return (

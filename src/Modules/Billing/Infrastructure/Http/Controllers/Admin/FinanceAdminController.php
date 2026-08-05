@@ -53,6 +53,7 @@ final class FinanceAdminController
             ->get()
             ->map(fn (InvoiceModel $i) => [
                 'id' => $i->id,
+                'number' => $i->number,
                 'account_id' => $i->account_id,
                 'status' => $i->status,
                 'amount_cents' => (int) $i->amount_cents,

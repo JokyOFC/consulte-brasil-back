@@ -53,6 +53,7 @@ final class ClientBillingController
 
                 return [
                     'id' => $i->id,
+                    'number' => $i->number,
                     'status' => $i->status,
                     'amount_cents' => (int) $i->amount_cents,
                     'description' => $i->description,

@@ -32,6 +32,7 @@ final class Invoice
         public array $items = [],
         public array $metadata = [],
         public ?DateTimeImmutable $createdAt = null,
+        public ?string $number = null,
     ) {}
 
     public function markPaid(string $paymentId, ?DateTimeImmutable $paidAt = null): void

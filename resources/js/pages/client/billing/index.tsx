@@ -1,4 +1,4 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     CalendarDays,
@@ -967,7 +967,12 @@ function InvoicesCard({ invoices }: { invoices: Invoice[] }) {
     return (
         <Card className="gap-0 py-0">
             <CardContent className="p-0">
-                <div className="border-b border-border px-6 py-3 text-sm font-semibold">Faturas em aberto</div>
+                <div className="flex items-center justify-between border-b border-border px-6 py-3">
+                    <span className="text-sm font-semibold">Faturas em aberto</span>
+                    <Button variant="ghost" size="sm" asChild>
+                        <Link href="/client/invoices">Ver todas</Link>
+                    </Button>
+                </div>
                 <table className="w-full text-sm">
                     <thead className="text-left text-muted-foreground">
                         <tr className="border-b border-border">

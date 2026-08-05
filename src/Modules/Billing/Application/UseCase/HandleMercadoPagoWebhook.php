@@ -6,6 +6,7 @@ namespace Src\Modules\Billing\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Application\Service\InvoiceNumberGenerator;
 use Src\Modules\Billing\Domain\Exception\PaymentGatewayError;
 use Src\Modules\Billing\Domain\Entity\Invoice;
 use Src\Modules\Billing\Domain\Entity\InvoiceItem;
@@ -41,6 +42,7 @@ final readonly class HandleMercadoPagoWebhook
         private PlanRepository $plans,
         private InvoiceRepository $invoices,
         private SettleApprovedPayment $settle,
+        private InvoiceNumberGenerator $invoiceNumbers,
         private IdGenerator $ids,
         private Clock $clock,
         private LoggerInterface $logger,
@@ -128,7 +130,9 @@ final readonly class HandleMercadoPagoWebhook
             periodStart: $now,
             periodEnd: $next,
             items: [new InvoiceItem($this->ids->generate(), $plan !== null ? "Plano {$plan->name}" : 'Assinatura', $invoiceAmount)],
+            metadata: ['origin' => 'preapproval'],
             createdAt: $now,
+            number: $this->invoiceNumbers->next(),
         );
         $this->invoices->save($invoice);
 

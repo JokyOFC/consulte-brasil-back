@@ -6,6 +6,7 @@ use App\Support\AdminConsumptionOverview;
 use App\Support\AppSettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Src\Modules\Support\Infrastructure\Persistence\Eloquent\Models\SupportTicketModel;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -60,8 +61,42 @@ class HandleInertiaRequests extends Middleware
             'adminShell' => fn () => $request->user()?->role === 'admin'
                 ? app(AdminConsumptionOverview::class)->headerPayload()
                 : null,
+            'unread_support_tickets' => fn () => $this->unreadSupportTicketsCount($request),
             'appTimezone' => config('app.timezone', 'America/Sao_Paulo'),
             'appDisplayTimezone' => config('app.display_timezone', 'America/Sao_Paulo'),
         ];
+    }
+
+    private function unreadSupportTicketsCount(Request $request): int
+    {
+        $user = $request->user();
+        if ($user === null) {
+            return 0;
+        }
+
+        try {
+            if ($user->role === 'admin') {
+                return SupportTicketModel::query()
+                    ->where('last_reply_by_staff', false)
+                    ->where(function ($q) {
+                        $q->whereNull('staff_last_read_at')
+                            ->orWhereColumn('last_reply_at', '>', 'staff_last_read_at');
+                    })
+                    ->count();
+            }
+
+            return SupportTicketModel::query()
+                ->where('user_id', $user->id)
+                ->where('last_reply_by_staff', true)
+                ->whereNotNull('last_reply_at')
+                ->where(function ($q) {
+                    $q->whereNull('user_last_read_at')
+                        ->orWhereColumn('last_reply_at', '>', 'user_last_read_at');
+                })
+                ->count();
+        } catch (\Throwable) {
+            // Tabela ainda não migrada / ambiente parcialmente provisionado.
+            return 0;
+        }
     }
 }

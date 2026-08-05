@@ -17,6 +17,7 @@ use Src\Modules\Billing\Domain\Repository\PlanRepository;
 use Src\Modules\Billing\Domain\Repository\SubscriptionRepository;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
 use Src\Modules\Billing\Infrastructure\Cache\CacheCreditBalanceCache;
+use Src\Modules\Billing\Infrastructure\Console\BackfillInvoiceNumbersCommand;
 use Src\Modules\Billing\Infrastructure\Console\ReconcileBalancesCommand;
 use Src\Modules\Billing\Infrastructure\Console\RunRecurringBillingCommand;
 use Src\Modules\Billing\Infrastructure\Console\SyncPaymentsCommand;
@@ -77,6 +78,7 @@ final class BillingServiceProvider extends ServiceProvider
                 ReconcileBalancesCommand::class,
                 RunRecurringBillingCommand::class,
                 SyncPaymentsCommand::class,
+                BackfillInvoiceNumbersCommand::class,
             ]);
         }
     }

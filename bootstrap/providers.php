@@ -9,6 +9,7 @@ use Src\Modules\Billing\Infrastructure\BillingServiceProvider;
 use Src\Modules\Consultation\Infrastructure\ConsultationServiceProvider;
 use Src\Modules\Identity\Infrastructure\IdentityServiceProvider;
 use Src\Modules\Provider\Infrastructure\ProviderServiceProvider;
+use Src\Modules\Support\Infrastructure\SupportServiceProvider;
 use Src\Shared\Infrastructure\SharedServiceProvider;
 
 return [
@@ -24,4 +25,5 @@ return [
     ProviderServiceProvider::class,
     ConsultationServiceProvider::class,
     AuditServiceProvider::class,
+    SupportServiceProvider::class,
 ];

@@ -31,6 +31,7 @@ interface PaymentRow {
 
 interface InvoiceRow {
     id: string;
+    number: string | null;
     account_id: string;
     status: string;
     amount_cents: number;
@@ -187,7 +188,10 @@ export default function AdminFinanceIndex() {
                                 <tbody>
                                     {invoices.map((inv) => (
                                         <tr key={inv.id} className="border-b border-border last:border-0">
-                                            <td className="px-6 py-3">{inv.description ?? 'Fatura'}</td>
+                                            <td className="px-6 py-3">
+                                                <div className="font-medium">{inv.number ?? inv.id.slice(0, 8)}</div>
+                                                <div className="text-xs text-muted-foreground">{inv.description ?? 'Fatura'}</div>
+                                            </td>
                                             <td className="px-6 py-3 text-muted-foreground">{inv.due_date ?? '—'}</td>
                                             <td className="px-6 py-3 font-medium">{formatBRL(inv.amount_cents)}</td>
                                             <td className="px-6 py-3 text-right">

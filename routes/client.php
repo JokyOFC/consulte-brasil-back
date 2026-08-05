@@ -5,9 +5,11 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Src\Modules\Audit\Infrastructure\Http\Controllers\Client\RequestLogsClientController;
 use Src\Modules\Billing\Infrastructure\Http\Controllers\Client\ClientBillingController;
+use Src\Modules\Billing\Infrastructure\Http\Controllers\Client\ClientInvoicesController;
 use Src\Modules\Consultation\Infrastructure\Http\Controllers\Client\ConsultationsClientController;
 use Src\Modules\Identity\Infrastructure\Http\Controllers\Client\ApiKeysController;
 use Src\Modules\Identity\Infrastructure\Http\Controllers\Client\WebhookClientController;
+use Src\Modules\Support\Infrastructure\Http\Controllers\Client\SupportTicketController;
 
 Route::middleware(['auth', 'verified'])
     ->prefix('client')
@@ -33,6 +35,16 @@ Route::middleware(['auth', 'verified'])
         // Financeiro: carteira, recarga, faturas e assinatura
         Route::get('/billing', [ClientBillingController::class, 'index'])->name('billing.index');
         Route::get('/billing/payments/{paymentId}/status', [ClientBillingController::class, 'paymentStatus'])->name('billing.payments.status');
+
+        Route::get('/invoices', [ClientInvoicesController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/{invoiceId}', [ClientInvoicesController::class, 'show'])->name('invoices.show');
+        Route::get('/invoices/{invoiceId}/pdf', [ClientInvoicesController::class, 'pdf'])->name('invoices.pdf');
+
+        Route::get('/tickets', [SupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('/tickets/create', [SupportTicketController::class, 'create'])->name('tickets.create');
+        Route::post('/tickets', [SupportTicketController::class, 'store'])->name('tickets.store');
+        Route::get('/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('tickets.show');
+        Route::post('/tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('tickets.reply');
 
         Route::middleware('throttle:10,1')->group(function () {
             Route::post('/billing/topup', [ClientBillingController::class, 'topup'])->name('billing.topup');
