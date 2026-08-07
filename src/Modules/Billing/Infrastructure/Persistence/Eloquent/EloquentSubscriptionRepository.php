@@ -9,6 +9,7 @@ use Src\Modules\Billing\Domain\Entity\Subscription;
 use Src\Modules\Billing\Domain\Repository\SubscriptionRepository;
 use Src\Modules\Billing\Domain\ValueObject\SubscriptionStatus;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\SubscriptionModel;
+use Src\Shared\Domain\ValueObject\Money;
 
 final class EloquentSubscriptionRepository implements SubscriptionRepository
 {
@@ -19,6 +20,8 @@ final class EloquentSubscriptionRepository implements SubscriptionRepository
             [
                 'account_id' => $subscription->accountId,
                 'plan_id' => $subscription->planId,
+                'price_cents' => $subscription->price?->cents,
+                'currency' => $subscription->price?->currency,
                 'status' => $subscription->status->value,
                 'mp_preapproval_id' => $subscription->mpPreapprovalId,
                 'payment_method' => $subscription->paymentMethod,
@@ -71,6 +74,7 @@ final class EloquentSubscriptionRepository implements SubscriptionRepository
             nextBillingAt: $m->next_billing_at ? new DateTimeImmutable($m->next_billing_at->toDateTimeString()) : null,
             cancelledAt: $m->cancelled_at ? new DateTimeImmutable($m->cancelled_at->toDateTimeString()) : null,
             createdAt: $m->created_at ? new DateTimeImmutable($m->created_at->toDateTimeString()) : null,
+            price: $m->price_cents !== null ? Money::of((int) $m->price_cents, (string) ($m->currency ?? 'BRL')) : null,
         );
     }
 }

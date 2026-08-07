@@ -14,5 +14,11 @@ final readonly class UpdatePlanInput
         public string $billingPeriod,
         public ?int $overagePriceCents,
         public string $status,
+        /**
+         * Se true, o novo preço vale também para quem já assinou (repreça o
+         * snapshot das assinaturas ativas). Se false (padrão), assinantes
+         * atuais continuam pagando o preço congelado na contratação.
+         */
+        public bool $applyToExistingSubscribers = false,
     ) {}
 }

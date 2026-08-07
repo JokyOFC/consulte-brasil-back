@@ -63,7 +63,9 @@ final readonly class RunRecurringBilling
                 continue;
             }
 
-            $amount = (int) $plan->price_cents;
+            // Preço congelado na contratação; fallback para o preço do plano
+            // em assinaturas antigas sem snapshot.
+            $amount = (int) ($sub->price_cents ?? $plan->price_cents);
             $periodEnd = $now->modify('+30 days');
 
             // Se já existe fatura em aberto (ex.: renovação antecipada ainda no prazo),

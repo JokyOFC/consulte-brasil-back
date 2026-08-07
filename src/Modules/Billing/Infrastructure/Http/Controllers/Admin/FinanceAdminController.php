@@ -75,7 +75,7 @@ final class FinanceAdminController
                 'subscriptions.next_billing_at',
                 'accounts.name as account_name',
                 'plans.name as plan_name',
-                'plans.price_cents',
+                DB::raw('coalesce(subscriptions.price_cents, plans.price_cents) as price_cents'),
             ])
             ->map(fn ($s) => [
                 'id' => $s->id,
@@ -90,7 +90,7 @@ final class FinanceAdminController
         $mrr = (int) DB::table('subscriptions')
             ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
             ->where('subscriptions.status', 'active')
-            ->sum('plans.price_cents');
+            ->sum(DB::raw('coalesce(subscriptions.price_cents, plans.price_cents)'));
 
         return Inertia::render('admin/finance/index', [
             'summary' => [

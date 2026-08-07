@@ -46,6 +46,8 @@ final readonly class AssignPlanToAccount
                 'id' => $subscriptionId,
                 'account_id' => $accountId,
                 'plan_id' => $plan->id,
+                'price_cents' => $plan->price->cents,
+                'currency' => $plan->price->currency,
                 'status' => 'active',
                 'current_period_start' => $now,
                 'current_period_end' => $periodEnd,

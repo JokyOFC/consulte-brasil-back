@@ -26,6 +26,9 @@ interface PaymentGateway
 
     public function cancelPreapproval(string $preapprovalId): void;
 
+    /** Altera o valor recorrente de um Preapproval ativo (repreçamento). */
+    public function updatePreapprovalAmount(string $preapprovalId, int $amountCents): void;
+
     public function getPayment(string $mpPaymentId): GatewayPaymentStatus;
 
     public function cancelPayment(string $mpPaymentId): void;

@@ -116,6 +116,24 @@ final class MercadoPagoGateway implements PaymentGateway
         }
     }
 
+    public function updatePreapprovalAmount(string $preapprovalId, int $amountCents): void
+    {
+        $this->configure();
+
+        try {
+            (new PreApprovalClient)->update($preapprovalId, [
+                'auto_recurring' => [
+                    'transaction_amount' => $this->toReais($amountCents),
+                    'currency_id' => 'BRL',
+                ],
+            ], $this->requestOptions());
+        } catch (MPApiException $e) {
+            throw PaymentGatewayError::from($this->describe($e));
+        } catch (Throwable $e) {
+            throw PaymentGatewayError::from($e->getMessage());
+        }
+    }
+
     public function getPayment(string $mpPaymentId): GatewayPaymentStatus
     {
         $this->configure();

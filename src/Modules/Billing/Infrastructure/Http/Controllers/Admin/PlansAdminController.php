@@ -42,9 +42,22 @@ final class PlansAdminController
             ->where('plan_id', $planId)
             ->count();
 
+        // Soma dos preços congelados (assinantes antigos podem pagar um valor
+        // diferente do preço atual do plano).
         $mrrCents = $plan->billingPeriod->value === 'monthly'
-            ? $plan->price->cents * $activeSubscriptions
+            ? (int) DB::table('subscriptions')
+                ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
+                ->where('subscriptions.plan_id', $planId)
+                ->where('subscriptions.status', 'active')
+                ->sum(DB::raw('coalesce(subscriptions.price_cents, plans.price_cents)'))
             : 0;
+
+        $legacyPriceSubscriptions = (int) DB::table('subscriptions')
+            ->where('plan_id', $planId)
+            ->whereIn('status', ['active', 'past_due'])
+            ->whereNotNull('price_cents')
+            ->where('price_cents', '!=', $plan->price->cents)
+            ->count();
 
         $recentSubscriptions = DB::table('subscriptions')
             ->leftJoin('accounts', 'subscriptions.account_id', '=', 'accounts.id')
@@ -55,6 +68,7 @@ final class PlansAdminController
                 'subscriptions.id',
                 'subscriptions.status',
                 'subscriptions.payment_method',
+                'subscriptions.price_cents',
                 'subscriptions.next_billing_at',
                 'subscriptions.created_at',
                 'accounts.name as account_name',
@@ -64,6 +78,7 @@ final class PlansAdminController
                 'account_name' => $row->account_name,
                 'status' => $row->status,
                 'payment_method' => $row->payment_method,
+                'price_cents' => $row->price_cents !== null ? (int) $row->price_cents : null,
                 'next_billing_at' => $row->next_billing_at
                     ? substr((string) $row->next_billing_at, 0, 10)
                     : null,
@@ -92,6 +107,7 @@ final class PlansAdminController
                 'active_subscriptions' => $activeSubscriptions,
                 'total_subscriptions' => $totalSubscriptions,
                 'mrr_cents' => $mrrCents,
+                'legacy_price_subscriptions' => $legacyPriceSubscriptions,
             ],
             'recent_subscriptions' => $recentSubscriptions,
         ]);
@@ -129,9 +145,10 @@ final class PlansAdminController
             'billing_period' => ['required', 'in:monthly,one_time'],
             'overage_price_cents' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:active,archived'],
+            'apply_to_existing_subscribers' => ['sometimes', 'boolean'],
         ]);
 
-        $updatePlan->handle(new UpdatePlanInput(
+        $result = $updatePlan->handle(new UpdatePlanInput(
             planId: $planId,
             name: $data['name'],
             priceCents: (int) $data['price_cents'],
@@ -141,8 +158,17 @@ final class PlansAdminController
                 ? (int) $data['overage_price_cents']
                 : null,
             status: $data['status'],
+            applyToExistingSubscribers: (bool) ($data['apply_to_existing_subscribers'] ?? false),
         ));
 
-        return back()->with('success', 'Plano atualizado.');
+        $message = 'Plano atualizado.';
+        if ($result->repricedSubscriptions > 0) {
+            $message .= " Novo preço aplicado a {$result->repricedSubscriptions} assinatura(s) existente(s).";
+        }
+        if ($result->preapprovalUpdateFailures > 0) {
+            $message .= " {$result->preapprovalUpdateFailures} assinatura(s) no cartão não puderam ser repreçadas no Mercado Pago e mantêm o preço anterior.";
+        }
+
+        return back()->with('success', $message);
     }
 }

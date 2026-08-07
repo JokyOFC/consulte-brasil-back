@@ -82,6 +82,7 @@ final readonly class SubscribeToPlan
                 renewsAt: $next,
                 nextBillingAt: $next,
                 createdAt: $now,
+                price: $plan->price,
             );
             $this->subscriptions->save($subscription);
 
@@ -100,6 +101,7 @@ final readonly class SubscribeToPlan
             renewsAt: $next,
             nextBillingAt: $next,
             createdAt: $now,
+            price: $plan->price,
         );
         $this->subscriptions->save($subscription);
 

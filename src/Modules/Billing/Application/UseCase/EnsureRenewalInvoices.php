@@ -61,7 +61,9 @@ final readonly class EnsureRenewalInvoices
                 continue;
             }
 
-            $amount = (int) $plan->price_cents;
+            // Preço congelado na contratação; fallback para o preço do plano
+            // em assinaturas antigas sem snapshot.
+            $amount = (int) ($sub->price_cents ?? $plan->price_cents);
             $due = $sub->next_billing_at
                 ? new \DateTimeImmutable($sub->next_billing_at->toDateTimeString())
                 : ($sub->current_period_end

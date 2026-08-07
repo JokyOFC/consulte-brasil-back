@@ -10,6 +10,7 @@ use Src\Modules\Billing\Application\Gateway\GatewayPaymentStatus;
 use Src\Modules\Billing\Application\Gateway\GatewayPreapproval;
 use Src\Modules\Billing\Application\Gateway\GatewayPreapprovalInput;
 use Src\Modules\Billing\Application\Port\PaymentGateway;
+use Src\Modules\Billing\Domain\Exception\PaymentGatewayError;
 
 /**
  * Gateway de pagamentos em memória para testes — substitui o Mercado Pago.
@@ -26,6 +27,12 @@ final class FakePaymentGateway implements PaymentGateway
     public array $remoteStatuses = [];
 
     public int $cancelledPreapprovals = 0;
+
+    /** @var list<array{id: string, amount_cents: int}> */
+    public array $updatedPreapprovals = [];
+
+    /** Simula falha do MP ao repreçar Preapprovals. */
+    public bool $failPreapprovalUpdates = false;
 
     /** @var list<string> */
     public array $cancelledPayments = [];
@@ -57,6 +64,15 @@ final class FakePaymentGateway implements PaymentGateway
     public function cancelPreapproval(string $preapprovalId): void
     {
         $this->cancelledPreapprovals++;
+    }
+
+    public function updatePreapprovalAmount(string $preapprovalId, int $amountCents): void
+    {
+        if ($this->failPreapprovalUpdates) {
+            throw PaymentGatewayError::from('preapproval update failed');
+        }
+
+        $this->updatedPreapprovals[] = ['id' => $preapprovalId, 'amount_cents' => $amountCents];
     }
 
     public function getPayment(string $mpPaymentId): GatewayPaymentStatus

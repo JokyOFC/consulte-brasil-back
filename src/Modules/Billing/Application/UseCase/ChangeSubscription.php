@@ -31,7 +31,8 @@ final readonly class ChangeSubscription
             throw SubscriptionNotFound::withId($subscriptionId);
         }
 
-        if ($this->plans->findById($newPlanId) === null) {
+        $newPlan = $this->plans->findById($newPlanId);
+        if ($newPlan === null) {
             throw PlanNotFound::withId($newPlanId);
         }
 
@@ -46,6 +47,7 @@ final readonly class ChangeSubscription
         }
 
         $subscription->planId = $newPlanId;
+        $subscription->price = $newPlan->price;
         $subscription->reactivate();
         $this->subscriptions->save($subscription);
     }

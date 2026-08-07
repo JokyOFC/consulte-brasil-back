@@ -50,7 +50,7 @@ final class ClientInvoicesController
                     'plan_name' => $plan?->name,
                     'status' => $s->status,
                     'payment_method' => $s->payment_method,
-                    'price_cents' => (int) ($plan?->price_cents ?? 0),
+                    'price_cents' => (int) ($s->price_cents ?? $plan?->price_cents ?? 0),
                     'recharge_cents' => (int) ($plan?->included_credits ?? 0),
                     'current_period_end' => optional($s->current_period_end)->toDateString(),
                     'next_billing_at' => optional($s->next_billing_at)->toDateString(),

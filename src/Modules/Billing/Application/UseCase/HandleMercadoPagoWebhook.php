@@ -117,7 +117,9 @@ final readonly class HandleMercadoPagoWebhook
         $plan = $this->plans->findById($subscription->planId);
         $now = $this->clock->now();
         $next = $now->modify('+30 days');
-        $invoiceAmount = $plan?->price->cents ?? $amountCents;
+        // Preço congelado na assinatura (é o valor que o Preapproval cobra);
+        // fallback: preço do plano e, por fim, o valor efetivamente pago.
+        $invoiceAmount = $subscription->price?->cents ?? $plan?->price->cents ?? $amountCents;
 
         $invoice = new Invoice(
             id: $this->ids->generate(),

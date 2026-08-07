@@ -15,6 +15,7 @@ import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -47,6 +48,7 @@ interface Stats {
     active_subscriptions: number;
     total_subscriptions: number;
     mrr_cents: number;
+    legacy_price_subscriptions: number;
 }
 
 interface SubscriptionRow {
@@ -54,6 +56,7 @@ interface SubscriptionRow {
     account_name: string | null;
     status: string;
     payment_method: string | null;
+    price_cents: number | null;
     next_billing_at: string | null;
     created_at: string | null;
 }
@@ -108,7 +111,11 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                         label="MRR deste plano"
                         value={formatBRL(stats.mrr_cents)}
                         icon={Wallet}
-                        hint={plan.billing_period === 'monthly' ? 'Receita recorrente estimada' : 'Plano avulso'}
+                        hint={plan.billing_period !== 'monthly'
+                            ? 'Plano avulso'
+                            : stats.legacy_price_subscriptions > 0
+                                ? `${stats.legacy_price_subscriptions} assinatura(s) com preço antigo`
+                                : 'Receita recorrente estimada'}
                     />
                     <StatCard
                         label="Saldo incluso"
@@ -189,6 +196,7 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                                     <th className="px-6 py-3 font-medium">Cliente</th>
                                     <th className="px-6 py-3 font-medium">Status</th>
                                     <th className="px-6 py-3 font-medium">Pagamento</th>
+                                    <th className="px-6 py-3 font-medium">Preço</th>
                                     <th className="px-6 py-3 font-medium">Próxima cobrança</th>
                                     <th className="px-6 py-3 font-medium">Desde</th>
                                 </tr>
@@ -210,6 +218,14 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                                         <td className="px-6 py-3 text-muted-foreground">
                                             {paymentMethodLabel(subscription.payment_method)}
                                         </td>
+                                        <td className="px-6 py-3 tabular-nums">
+                                            {subscription.price_cents !== null ? formatBRL(subscription.price_cents) : formatBRL(plan.price_cents)}
+                                            {subscription.price_cents !== null && subscription.price_cents !== plan.price_cents && (
+                                                <Badge variant="outline" className="ml-2 border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                                                    preço antigo
+                                                </Badge>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-3 text-muted-foreground">
                                             {subscription.next_billing_at ? formatDateShort(subscription.next_billing_at) : '—'}
                                         </td>
@@ -220,7 +236,7 @@ export default function AdminPlanShow({ plan, stats, recent_subscriptions }: Pro
                                 ))}
                                 {recent_subscriptions.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                             Nenhuma assinatura neste plano ainda.
                                         </td>
                                     </tr>
@@ -242,7 +258,10 @@ function EditPlanForm({ plan }: { plan: Plan }) {
         billing_period: plan.billing_period,
         overage_reais: plan.overage_price_cents !== null ? (plan.overage_price_cents / 100).toFixed(2) : '',
         status: plan.status,
+        apply_to_existing: false,
     });
+
+    const priceChanged = Math.round(Number(form.data.price_reais) * 100) !== plan.price_cents;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -253,6 +272,7 @@ function EditPlanForm({ plan }: { plan: Plan }) {
             billing_period: data.billing_period,
             overage_price_cents: data.overage_reais === '' ? null : Math.round(Number(data.overage_reais) * 100),
             status: data.status,
+            apply_to_existing_subscribers: data.apply_to_existing,
         }));
         form.put(`/admin/plans/${plan.id}`, { preserveScroll: true });
     };
@@ -323,6 +343,27 @@ function EditPlanForm({ plan }: { plan: Plan }) {
                     </Select>
                 </FormField>
             </div>
+
+            {priceChanged && (
+                <div className="space-y-2 rounded-xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <label className="flex items-start gap-3">
+                        <Checkbox
+                            checked={form.data.apply_to_existing}
+                            onCheckedChange={(checked) => form.setData('apply_to_existing', checked === true)}
+                            className="mt-0.5"
+                        />
+                        <span className="text-sm">
+                            <span className="font-medium">Aplicar o novo preço aos assinantes atuais</span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                                Desmarcado (padrão): quem já assinou continua pagando o preço contratado; só novas
+                                assinaturas usam o novo preço. Marcado: as assinaturas ativas passam a ser cobradas
+                                pelo novo valor a partir do próximo ciclo (assinaturas no cartão têm o valor
+                                atualizado também no Mercado Pago).
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            )}
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <p className="text-xs text-muted-foreground">
