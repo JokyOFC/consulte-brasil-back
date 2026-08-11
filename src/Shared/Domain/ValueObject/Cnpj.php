@@ -7,7 +7,9 @@ namespace Src\Shared\Domain\ValueObject;
 use Src\Shared\Domain\Exception\InvalidArgumentException;
 
 /**
- * CNPJ validado (somente dígitos armazenados).
+ * CNPJ validado (armazenado sem máscara, em maiúsculas). Aceita o formato
+ * alfanumérico da IN RFB 2.229/2024: 12 posições alfanuméricas seguidas de
+ * 2 dígitos verificadores sempre numéricos.
  */
 final readonly class Cnpj
 {
@@ -19,26 +21,27 @@ final readonly class Cnpj
 
     public static function fromString(string $raw): self
     {
-        $digits = preg_replace('/\D/', '', $raw) ?? '';
+        $chars = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $raw) ?? '');
 
-        if (! self::isValid($digits)) {
+        if (! self::isValid($chars)) {
             throw new InvalidArgumentException("Invalid CNPJ: {$raw}.");
         }
 
-        return new self($digits);
+        return new self($chars);
     }
 
     public function formatted(): string
     {
-        return preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $this->value);
+        return preg_replace('/([0-9A-Z]{2})([0-9A-Z]{3})([0-9A-Z]{3})([0-9A-Z]{4})([0-9]{2})/', '$1.$2.$3/$4-$5', $this->value);
     }
 
     private static function isValid(string $cnpj): bool
     {
-        if (strlen($cnpj) !== 14) {
+        if (! preg_match('/^[0-9A-Z]{12}[0-9]{2}$/', $cnpj)) {
             return false;
         }
 
+        // Sequências repetidas só invalidam o formato todo-numérico legado.
         if (preg_match('/^(\d)\1{13}$/', $cnpj)) {
             return false;
         }
@@ -50,12 +53,17 @@ final readonly class Cnpj
         return (int) $cnpj[13] === self::checkDigit($cnpj, self::WEIGHTS_SECOND);
     }
 
-    /** @param list<int> $weights */
+    /**
+     * Valor de cada caractere segue a IN RFB 2.229/2024: ord(char) - 48
+     * (dígitos mantêm 0-9; A=17 ... Z=42).
+     *
+     * @param  list<int>  $weights
+     */
     private static function checkDigit(string $cnpj, array $weights): int
     {
         $sum = 0;
         foreach ($weights as $i => $weight) {
-            $sum += (int) $cnpj[$i] * $weight;
+            $sum += (ord($cnpj[$i]) - 48) * $weight;
         }
         $remainder = $sum % 11;
 

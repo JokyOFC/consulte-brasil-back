@@ -78,6 +78,11 @@ final class ApiBrasilTimeoutResolutionTest extends TestCase
             {
                 return [];
             }
+
+            public function enabledCapabilityConfigs(string $identifier): array
+            {
+                return [];
+            }
         };
 
         return new ApiBrasilAdapter(

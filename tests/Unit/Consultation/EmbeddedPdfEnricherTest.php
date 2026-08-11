@@ -56,6 +56,97 @@ final class EmbeddedPdfEnricherTest extends TestCase
         $this->assertSame('Leuton Budim', $enriched['cac']['certificado']['nome']);
     }
 
+    public function test_it_extracts_certificate_from_situacao_comprovante_pdf(): void
+    {
+        $extractor = new class extends EmbeddedPdfTextExtractor
+        {
+            public function extract(string $base64): ?string
+            {
+                return <<<'TEXT'
+                Comprovante de Situação Cadastral no CPF
+                CPF: 111.444.777-35
+                Nome: TEST TOKEN
+                Situação Cadastral: REGULAR
+                Data da Inscrição: 10/10/1990
+                Comprovante emitido às 10:20:30 do dia 01/08/2026
+                Receita Federal
+                TEXT;
+            }
+        };
+
+        $enricher = new EmbeddedPdfEnricher($extractor, new CertificateTextParser);
+
+        // Payload estilo pacotes 8/9 (cpf_situacao/cpf_completo): campos de
+        // situação e o PDF do comprovante na raiz.
+        $enriched = $enricher->enrich([
+            'cpf' => '111.444.777-35',
+            'nome' => 'Test Token',
+            'situacao' => 'Regular',
+            'situacaoComprovante' => 'ABCD.1234.EF56.7890',
+            'situacaoComprovantePdf' => 'JVBERi0fake',
+        ]);
+
+        $this->assertSame('situacao_cadastral', $enriched['certificado']['tipo']);
+        $this->assertSame('Comprovante de Situação Cadastral', $enriched['certificado']['titulo']);
+        $this->assertSame('111.444.777-35', $enriched['certificado']['cpf']);
+        $this->assertSame('Receita Federal', $enriched['certificado']['orgaoEmissor']);
+        $this->assertNotEmpty($enriched['certificado']['textoResumo']);
+
+        // Comprovante já processado não pode ficar marcado como pendente.
+        $this->assertFalse($enricher->containsPendingPdf($enriched));
+    }
+
+    public function test_situacao_certificate_does_not_promote_certidao_fields_to_root(): void
+    {
+        $extractor = new class extends EmbeddedPdfTextExtractor
+        {
+            public function extract(string $base64): ?string
+            {
+                return 'Comprovante de Situação Cadastral NADA CONSTA Protocolo: 1262781620261234';
+            }
+        };
+
+        $enricher = new EmbeddedPdfEnricher($extractor, new CertificateTextParser);
+
+        $enriched = $enricher->enrich([
+            'cpf' => '111.444.777-35',
+            'situacao' => 'Regular',
+            'situacaoComprovantePdf' => 'JVBERi0fake',
+        ]);
+
+        // O que o parser achou fica restrito ao certificado; nadaConsta e
+        // nrProtocolo são campos de certidão e não sobem para a raiz.
+        $this->assertTrue($enriched['certificado']['nadaConsta']);
+        $this->assertSame('1262781620261234', $enriched['certificado']['nrProtocolo']);
+        $this->assertArrayNotHasKey('nadaConsta', $enriched);
+        $this->assertArrayNotHasKey('nrProtocolo', $enriched);
+    }
+
+    public function test_cac_certificate_fields_are_still_merged_into_the_node(): void
+    {
+        $extractor = new class extends EmbeddedPdfTextExtractor
+        {
+            public function extract(string $base64): ?string
+            {
+                return 'CERTIDÃO DE ANTECEDENTES CRIMINAIS NADA CONSTA em nome de LEUTON BUDIM Protocolo: 126278162026';
+            }
+        };
+
+        $enricher = new EmbeddedPdfEnricher($extractor, new CertificateTextParser);
+
+        $enriched = $enricher->enrich([
+            'cpf' => '785.111.519-15',
+            'nome' => 'Leuton Budim',
+            'cac' => [
+                'comprovantePdfBase64' => 'JVBERi0fake',
+                'nadaConsta' => null,
+            ],
+        ]);
+
+        $this->assertTrue($enriched['cac']['nadaConsta']);
+        $this->assertSame('126278162026', $enriched['cac']['nrProtocolo']);
+    }
+
     public function test_it_does_not_enrich_nested_raw_payload_on_cache_reprocess(): void
     {
         $extractor = new class extends EmbeddedPdfTextExtractor

@@ -61,15 +61,12 @@ final readonly class FetchProviderBalance
     private function fetchCpfCnpj(Provider $provider, string $token, string $fetchedAt): ProviderBalanceResult
     {
         $baseUrl = $this->credentials->baseUrl($provider);
-        $packageIds = $this->packageIdsForProvider($provider->id);
 
-        $packages = [];
-        foreach ($packageIds as $packageId) {
-            $row = $this->cpfCnpj->fetchPackageBalance($baseUrl, $token, $packageId);
-            if ($row !== null) {
-                $packages[] = $row;
-            }
-        }
+        $packages = $this->cpfCnpj->fetchPackageBalances(
+            $baseUrl,
+            $token,
+            $this->packageIdsForProvider($provider->identifier),
+        );
 
         if ($packages === []) {
             return new ProviderBalanceResult(
@@ -115,10 +112,31 @@ final readonly class FetchProviderBalance
     }
 
     /** @return list<string> */
-    private function packageIdsForProvider(string $providerId): array
+    private function packageIdsForProvider(string $identifier): array
     {
-        // Apenas pacotes principais (CPF/CNPJ) — evita dezenas de chamadas e
-        // poluição na UI quando há muitos tipos de consulta mapeados.
+        // O saldo da CPF.CNPJ é POR PACOTE: enumera os pacotes distintos das
+        // capabilities habilitadas para nenhum pacote em uso zerar sem
+        // visibilidade. O endpoint de saldo é gratuito e as chamadas saem em
+        // paralelo (Http::pool).
+        $ids = [];
+        foreach ($this->providers->enabledCapabilityConfigs($identifier) as $config) {
+            $endpoint = $config['endpoint'] ?? null;
+            if (is_int($endpoint)) {
+                $endpoint = (string) $endpoint;
+            }
+            if (is_string($endpoint) && ctype_digit($endpoint)) {
+                $ids[] = $endpoint;
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        usort($ids, static fn (string $a, string $b) => (int) $a <=> (int) $b);
+
+        if ($ids !== []) {
+            return $ids;
+        }
+
+        // Sem capability cadastrada: pacotes principais (CPF/CNPJ) do config.
         return [
             (string) config('services.cpfcnpj.packages.cpf', '2'),
             (string) config('services.cpfcnpj.packages.cnpj', '6'),

@@ -3,6 +3,7 @@ import { isBase64PdfValue } from '@/lib/consultation-attachments';
 const FIELD_LABELS: Record<string, string> = {
     name: 'Nome',
     birth_date: 'Data de nascimento',
+    gender: 'Gênero',
     status: 'Situação',
     mother_name: 'Nome da mãe',
     corporate_name: 'Razão social',

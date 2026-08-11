@@ -6,6 +6,10 @@ namespace Tests\Feature\Consultation;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
+use Mockery;
+use Psr\Log\LoggerInterface;
 use Src\Modules\Consultation\Domain\Exception\ProviderUnavailable;
 use Src\Modules\Consultation\Domain\ValueObject\ConsultationRequest;
 use Src\Modules\Consultation\Domain\ValueObject\QueryType;
@@ -37,13 +41,15 @@ final class CpfCnpjAdapterTest extends TestCase
 
     public function test_it_maps_a_successful_cpf_response_into_normalized_data(): void
     {
+        // Shape real do pacote 2 (CPF C): nome, nascimento, mãe e gênero —
+        // sem "situacao" (exclusivo dos pacotes 8/9/18/26).
         Http::fake([
             'api.cpfcnpj.test/test-token/2/11144477735' => Http::response([
                 'status' => 1,
                 'cpf' => '111.444.777-35',
                 'nome' => 'Test Token',
                 'nascimento' => '31/12/1900',
-                'situacao' => 'Regular',
+                'genero' => 'M',
                 'mae' => 'Maria Jose',
             ], 200),
         ]);
@@ -55,12 +61,38 @@ final class CpfCnpjAdapterTest extends TestCase
         $this->assertSame('cpfcnpj', $result->meta->providerIdentifier);
         $this->assertSame('Test Token', $result->data['name']);
         $this->assertSame('31/12/1900', $result->data['birth_date']);
-        $this->assertSame('Regular', $result->data['status']);
+        $this->assertSame('M', $result->data['gender']);
         $this->assertSame('Maria Jose', $result->data['mother_name']);
+        $this->assertArrayNotHasKey('status', $result->data);
 
         // Documento higienizado (sem pontuação) na URL via GET.
         Http::assertSent(fn ($request) => $request->method() === 'GET'
             && str_contains($request->url(), '/test-token/2/11144477735'));
+    }
+
+    public function test_situacao_from_package_9_is_mapped_to_normalized_status(): void
+    {
+        config()->set('services.cpfcnpj.packages', ['cpf' => '9']);
+
+        Http::fake([
+            'api.cpfcnpj.test/test-token/9/11144477735' => Http::response([
+                'status' => 1,
+                'cpf' => '111.444.777-35',
+                'nome' => 'Test Token',
+                'nascimento' => '31/12/1900',
+                'genero' => 'F',
+                'mae' => 'Maria Jose',
+                'situacao' => 'Regular',
+                'situacaoDigito' => '00',
+            ], 200),
+        ]);
+
+        $result = app(CpfCnpjAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+        );
+
+        $this->assertSame('Regular', $result->data['status']);
+        $this->assertSame('F', $result->data['gender']);
     }
 
     public function test_it_maps_a_successful_cnpj_response(): void
@@ -112,6 +144,131 @@ final class CpfCnpjAdapterTest extends TestCase
 
         app(CpfCnpjAdapter::class)->fetch(
             new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+        );
+    }
+
+    public function test_rate_limit_1007_retries_once_after_waiting_and_succeeds(): void
+    {
+        Sleep::fake();
+
+        Http::fake([
+            'api.cpfcnpj.test/*' => Http::sequence()
+                ->push(['status' => 0, 'erro' => 'Limite de requisições (20) por segundo excedido...', 'erroCodigo' => 1007], 200)
+                ->push(['status' => 1, 'nome' => 'Test Token'], 200),
+        ]);
+
+        $result = app(CpfCnpjAdapter::class)->fetch(
+            new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+        );
+
+        $this->assertSame('Test Token', $result->data['name']);
+
+        Http::assertSentCount(2);
+        Sleep::assertSleptTimes(1);
+    }
+
+    public function test_rate_limit_1007_that_persists_becomes_transient_failure(): void
+    {
+        Sleep::fake();
+
+        Http::fake([
+            'api.cpfcnpj.test/*' => Http::response([
+                'status' => 0,
+                'erro' => 'Limite de requisições (20) por segundo excedido...',
+                'erroCodigo' => 1007,
+            ], 200),
+        ]);
+
+        try {
+            app(CpfCnpjAdapter::class)->fetch(
+                new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+            );
+            $this->fail('Expected ProviderUnavailable to be thrown.');
+        } catch (ProviderUnavailable $e) {
+            $this->assertTrue($e->transient);
+        }
+
+        // Só UMA retentativa local; depois entrega ao circuito/failover.
+        Http::assertSentCount(2);
+        Sleep::assertSleptTimes(1);
+    }
+
+    public function test_supplier_offline_1006_is_transient_so_circuit_records_the_failure(): void
+    {
+        Http::fake([
+            'api.cpfcnpj.test/*' => Http::response([
+                'status' => 0,
+                'erro' => 'Supplier 2 offline. Contact us!',
+                'erroCodigo' => 1006,
+            ], 200),
+        ]);
+
+        try {
+            app(CpfCnpjAdapter::class)->fetch(
+                new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+            );
+            $this->fail('Expected ProviderUnavailable to be thrown.');
+        } catch (ProviderUnavailable $e) {
+            $this->assertTrue($e->transient);
+        }
+    }
+
+    public function test_invalid_token_1000_is_not_transient_and_raises_critical_alert(): void
+    {
+        $logger = Mockery::spy(LoggerInterface::class);
+        Log::partialMock()->shouldReceive('channel')->with('consultation')->andReturn($logger);
+
+        Http::fake([
+            'api.cpfcnpj.test/*' => Http::response([
+                'status' => 0,
+                'erro' => 'Token inválido!',
+                'erroCodigo' => 1000,
+            ], 200),
+        ]);
+
+        try {
+            app(CpfCnpjAdapter::class)->fetch(
+                new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+            );
+            $this->fail('Expected ProviderUnavailable to be thrown.');
+        } catch (ProviderUnavailable $e) {
+            $this->assertFalse($e->transient);
+        }
+
+        $logger->shouldHaveReceived('critical')->with(
+            'provider.account_error',
+            Mockery::on(fn (array $context): bool => $context['provider'] === 'cpfcnpj'
+                && $context['erro_codigo'] === 1000
+                && $context['query_type'] === 'cpf'),
+        );
+    }
+
+    public function test_exhausted_credits_1001_is_not_transient_and_raises_critical_alert(): void
+    {
+        $logger = Mockery::spy(LoggerInterface::class);
+        Log::partialMock()->shouldReceive('channel')->with('consultation')->andReturn($logger);
+
+        Http::fake([
+            'api.cpfcnpj.test/*' => Http::response([
+                'status' => 0,
+                'erro' => 'Créditos insuficientes!',
+                'erroCodigo' => 1001,
+            ], 200),
+        ]);
+
+        try {
+            app(CpfCnpjAdapter::class)->fetch(
+                new ConsultationRequest(new QueryType('cpf'), ['document' => '11144477735']),
+            );
+            $this->fail('Expected ProviderUnavailable to be thrown.');
+        } catch (ProviderUnavailable $e) {
+            $this->assertFalse($e->transient);
+        }
+
+        $logger->shouldHaveReceived('critical')->with(
+            'provider.account_error',
+            Mockery::on(fn (array $context): bool => $context['provider'] === 'cpfcnpj'
+                && $context['erro_codigo'] === 1001),
         );
     }
 
@@ -206,8 +363,13 @@ final class CpfCnpjAdapterTest extends TestCase
             new ConsultationRequest(new QueryType('cnpj_razao'), ['razao_social' => 'GOOGLE BRASIL']),
         );
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/test-token/4/')
-            && str_contains($request->url(), 'razao_social=GOOGLE'));
+        // Sem documento, o path termina no pacote — sem barra final.
+        Http::assertSent(function ($request): bool {
+            $path = (string) parse_url($request->url(), PHP_URL_PATH);
+
+            return str_ends_with($path, '/test-token/4')
+                && str_contains($request->url(), 'razao_social=GOOGLE');
+        });
     }
 
     public function test_sandbox_environment_uses_sandbox_token(): void

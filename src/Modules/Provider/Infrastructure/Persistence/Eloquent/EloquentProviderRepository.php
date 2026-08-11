@@ -52,6 +52,25 @@ final class EloquentProviderRepository implements ProviderRepository
         return is_array($config) ? $config : [];
     }
 
+    public function enabledCapabilityConfigs(string $identifier): array
+    {
+        $providerId = ProviderModel::query()
+            ->where('identifier', $identifier)
+            ->value('id');
+
+        if ($providerId === null) {
+            return [];
+        }
+
+        return ProviderCapabilityModel::query()
+            ->where('provider_id', $providerId)
+            ->where('enabled', true)
+            ->pluck('config')
+            ->filter(static fn ($config) => is_array($config))
+            ->values()
+            ->all();
+    }
+
     private function toEntity(ProviderModel $model): Provider
     {
         return new Provider(
