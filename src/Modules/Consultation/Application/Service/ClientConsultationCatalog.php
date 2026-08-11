@@ -34,6 +34,18 @@ final readonly class ClientConsultationCatalog
         'ab_ia_',
     ];
 
+    /**
+     * Codes públicos com prefixo "ab_cpf_" cujos produtos na API Brasil são
+     * consultas por CNPJ (Define Limite PJ). O code não pode ser renomeado
+     * sem quebrar integrações de clientes; a classificação corrige o grupo.
+     *
+     * @var list<string>
+     */
+    public const CNPJ_CODE_EXCEPTIONS = [
+        'ab_cpf_limite',
+        'ab_cpf_limite_positivo',
+    ];
+
     public function __construct(
         private ProviderRegistry $registry,
     ) {}
@@ -222,12 +234,15 @@ final readonly class ClientConsultationCatalog
 
     private function isCpfGroup(string $code): bool
     {
-        return str_starts_with($code, 'cpf') || str_starts_with($code, 'ab_cpf');
+        return ! in_array($code, self::CNPJ_CODE_EXCEPTIONS, true)
+            && (str_starts_with($code, 'cpf') || str_starts_with($code, 'ab_cpf'));
     }
 
     private function isCnpjGroup(string $code): bool
     {
-        return str_starts_with($code, 'cnpj') || str_starts_with($code, 'ab_cnpj');
+        return in_array($code, self::CNPJ_CODE_EXCEPTIONS, true)
+            || str_starts_with($code, 'cnpj')
+            || str_starts_with($code, 'ab_cnpj');
     }
 
     private function isLocationUtilityGroup(string $code): bool
