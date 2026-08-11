@@ -11,6 +11,7 @@ final class EmbeddedPdfEnricher
         'comprovantePdfBase64',
         'pdfBase64',
         'certificadoPdfBase64',
+        'situacaoComprovantePdf',
     ];
 
     public function __construct(
@@ -177,6 +178,12 @@ final class EmbeddedPdfEnricher
             return true;
         }
 
+        // Comprovante de situação cadastral não possui conclusão/nada consta/
+        // protocolo; a exigência abaixo vale apenas para certidões (CAC etc.).
+        if (($certificado['tipo'] ?? null) === 'situacao_cadastral') {
+            return false;
+        }
+
         return ! array_key_exists('conclusao', $certificado)
             || ! array_key_exists('nadaConsta', $certificado)
             || ! array_key_exists('nrProtocolo', $certificado);
@@ -297,6 +304,12 @@ final class EmbeddedPdfEnricher
      */
     private function mergeCertificateIntoNode(array &$node, array $certificado): void
     {
+        // nadaConsta/nrProtocolo são campos de certidão; não promove para o
+        // nó quando o PDF é um comprovante de situação cadastral.
+        if (($certificado['tipo'] ?? null) === 'situacao_cadastral') {
+            return;
+        }
+
         if (array_key_exists('nadaConsta', $certificado) && $certificado['nadaConsta'] !== null) {
             if (! array_key_exists('nadaConsta', $node) || $node['nadaConsta'] === null) {
                 $node['nadaConsta'] = $certificado['nadaConsta'];

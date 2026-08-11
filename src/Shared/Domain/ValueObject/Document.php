@@ -8,8 +8,9 @@ use Src\Shared\Domain\Exception\InvalidArgumentException;
 
 /**
  * Documento de identificação de uma conta: CPF (pessoa física) ou CNPJ
- * (pessoa jurídica). Detecta o tipo pelo número de dígitos e delega a
- * validação ao Value Object correspondente.
+ * (pessoa jurídica). Detecta o tipo pelo comprimento sem máscara — CPF tem
+ * 11 dígitos, CNPJ tem 14 posições (alfanuméricas desde a IN RFB 2.229/2024)
+ * — e delega a validação ao Value Object correspondente.
  */
 final readonly class Document
 {
@@ -24,11 +25,11 @@ final readonly class Document
 
     public static function fromString(string $raw): self
     {
-        $digits = preg_replace('/\D/', '', $raw) ?? '';
+        $chars = preg_replace('/[^0-9A-Za-z]/', '', $raw) ?? '';
 
-        return match (strlen($digits)) {
-            11 => new self(Cpf::fromString($digits)->value, self::TYPE_CPF),
-            14 => new self(Cnpj::fromString($digits)->value, self::TYPE_CNPJ),
+        return match (strlen($chars)) {
+            11 => new self(Cpf::fromString($chars)->value, self::TYPE_CPF),
+            14 => new self(Cnpj::fromString($chars)->value, self::TYPE_CNPJ),
             default => throw new InvalidArgumentException("Document must be a valid CPF or CNPJ: {$raw}."),
         };
     }

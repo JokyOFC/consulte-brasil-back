@@ -35,6 +35,9 @@ final class CpfCnpjResponseMapper
         'cpf' => [
             'name' => 'nome',
             'birth_date' => 'nascimento',
+            'gender' => 'genero',
+            // "situacao" só é retornado pelos pacotes 8/9/18/26 (o pacote 2,
+            // padrão, não traz) — mantido para override de pacote na capability.
             'status' => 'situacao',
             'mother_name' => 'mae',
         ],

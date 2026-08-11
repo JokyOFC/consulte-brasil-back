@@ -20,4 +20,13 @@ interface ProviderRepository
      * @return array<string, mixed>
      */
     public function capabilityConfig(string $identifier, string $queryType): array;
+
+    /**
+     * Configs (JSON) de todas as capabilities habilitadas de um provedor.
+     * Usada para enumerar os endpoints/pacotes em uso. Vazio se não houver
+     * capability habilitada cadastrada.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function enabledCapabilityConfigs(string $identifier): array;
 }

@@ -11,7 +11,6 @@ use Database\Seeders\ProviderSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Src\Modules\Provider\Infrastructure\Persistence\Eloquent\Models\ProviderCapabilityModel;
-use Src\Modules\Provider\Infrastructure\Persistence\Eloquent\Models\ProviderModel;
 use Tests\TestCase;
 
 final class SyncProviderPricingCommandTest extends TestCase
@@ -44,7 +43,7 @@ final class SyncProviderPricingCommandTest extends TestCase
         $expectedPrice = Pricing::sellPriceCents($expectedCost);
 
         $this->setOutdatedPrice('cpf_analise_credito_basic', 120, 132);
-        $this->setOutdatedPrice('cpf_cns', 24, 26);
+        $this->setOutdatedPrice('cpf_cns', 25, 28);
 
         $this->artisan('catalog:reprice', ['--force' => true])
             ->expectsOutputToContain('Reprecificação concluída')

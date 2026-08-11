@@ -39,12 +39,13 @@ final class CpfCnpjCatalogSeeder extends Seeder
         ['cpf_empresas', 'CPF — Empresas', 'CNPJs em que o titular é sócio.', '15', 0.23],
         ['cpf_endereco_situacao', 'CPF — Endereço e situação', 'Nome, nascimento, endereço e situação cadastral.', '18', 1.57],
         ['cpf_contatos', 'CPF — Contatos', 'E-mails, telefones e WhatsApp.', '21', 0.27],
-        ['cpf_family', 'CPF — Família', 'Vínculos familiares do titular.', '20', 1.13],
+        // "CPF Family" é só o nome comercial do fornecedor; o pacote 20 retorna dado criminal.
+        ['cpf_family', 'CPF — Mandados de Prisão (BNMP/CNJ)', 'Mandados de prisão registrados no BNMP/CNJ vinculados ao CPF.', '20', 1.13],
         ['cpf_programas_sociais', 'CPF — Programas sociais', 'Programas sociais em que o titular participa.', '22', 0.17],
         ['cpf_antecedentes', 'CPF — Mandados/Antecedentes', 'Mandados de busca e apreensão (BNMP) e lista INTERPOL.', '23', 1.46],
         ['cpf_situacao_simples', 'CPF — Situação simplificada', 'Nome, nascimento e situação cadastral.', '26', 0.37],
         ['cpf_cac', 'CPF — Antecedentes criminais (CAC/SINIC)', 'Certidão de antecedentes criminais (PF) em PDF.', '27', 0.27],
-        ['cpf_cns', 'CPF — Cartão Nacional de Saúde', 'CNS de 15 dígitos vinculado ao CPF.', '24', 0.25],
+        ['cpf_cns', 'CPF — Cartão Nacional de Saúde', 'CNS de 15 dígitos vinculado ao CPF.', '24', 0.24],
         ['cpf_risco', 'CPF — Score de risco', 'Nível e score de risco do CPF.', '13', 0.50],
 
         // ===== CNPJ =====

@@ -13,12 +13,12 @@ use Psr\Log\LoggerInterface;
 use Src\Modules\Consultation\Application\Port\ConsultationResultCache;
 use Src\Modules\Consultation\Application\Port\ProviderResolver;
 use Src\Modules\Consultation\Application\Service\ProviderRouter;
+use Src\Modules\Consultation\Domain\Event\ConsultationCompleted;
 use Src\Modules\Consultation\Domain\Port\QueryTypeCatalog;
 use Src\Modules\Consultation\Domain\Repository\ConsultationRepository;
 use Src\Modules\Consultation\Infrastructure\Cache\CacheConsultationResultCache;
 use Src\Modules\Consultation\Infrastructure\Console\PurgeConsultationRequestHashCommand;
 use Src\Modules\Consultation\Infrastructure\Console\RefreshCachedPdfResultsCommand;
-use Src\Modules\Consultation\Domain\Event\ConsultationCompleted;
 use Src\Modules\Consultation\Infrastructure\Enrichment\CachedConsultationResultEnricher;
 use Src\Modules\Consultation\Infrastructure\Listeners\DispatchConsultationWebhook;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\EloquentConsultationRepository;
@@ -90,6 +90,8 @@ final class ConsultationServiceProvider extends ServiceProvider
                 ),
                 mapper: new CpfCnpjResponseMapper,
                 providers: $app->make(ProviderRepository::class),
+                // Alertas de conta/credenciais no mesmo canal dedicado do router.
+                logger: Log::channel('consultation'),
                 defaultBaseUrl: (string) ($config['base_url'] ?? ''),
                 defaultToken: (string) ($config['token'] ?? ''),
                 defaultSandboxToken: (string) ($config['sandbox_token'] ?? ''),

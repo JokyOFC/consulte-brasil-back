@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Src\Modules\Consultation\Infrastructure\Provider\CpfCnpj;
 
+use Illuminate\Support\Sleep;
+use Psr\Log\LoggerInterface;
 use Src\Modules\Consultation\Domain\Exception\ProviderUnavailable;
 use Src\Modules\Consultation\Domain\Port\DataProviderPort;
 use Src\Modules\Consultation\Domain\ValueObject\ConsultationRequest;
@@ -29,6 +31,7 @@ final readonly class CpfCnpjAdapter implements DataProviderPort
         private CpfCnpjHttpClient $client,
         private CpfCnpjResponseMapper $mapper,
         private ProviderRepository $providers,
+        private LoggerInterface $logger,
         private string $defaultBaseUrl,
         private string $defaultToken,
         private string $defaultSandboxToken,
@@ -64,27 +67,85 @@ final readonly class CpfCnpjAdapter implements DataProviderPort
             $runtime['base_url'],
             $runtime['token'],
         );
+
+        // 1007 = limite de 20 req/s. A doc orienta "aguarde o próximo segundo
+        // e tente novamente": UMA retentativa local após ~1s resolve o caso
+        // comum sem envolver failover/circuito.
+        if ($this->errorCode($response['body']) === 1007) {
+            Sleep::for(1)->second();
+
+            $response = $this->client->get(
+                $runtime['package'],
+                $document,
+                $this->extraQuery($request),
+                $runtime['base_url'],
+                $runtime['token'],
+            );
+        }
+
         $latency = (int) round((microtime(true) - $startedAt) * 1000);
 
         // Falha de negócio (erro/erroCodigo ou status != 1) → aciona estorno
         // (o cliente nunca paga por "documento não encontrado", saldo inválido,
-        // etc.), mas NÃO abre o circuito: o provedor está saudável, é só esta
-        // requisição que não rendeu dado (transient: false).
+        // etc.). Se a falha conta no circuito depende do erroCodigo — ver
+        // unavailableFor().
         if ($this->mapper->isError($response['body'])) {
-            throw new ProviderUnavailable(
-                $this->identifier(),
-                transient: false,
-                context: [
-                    'http_status' => $response['status'],
-                    'body' => $response['body'],
-                ],
-            );
+            throw $this->unavailableFor($request->type, $response);
         }
 
         return $this->mapper->toResult($request->type, $response['body'], [
             'latency_ms' => $latency,
             'http_status' => $response['status'],
         ]);
+    }
+
+    /**
+     * Traduz o "erroCodigo" transversal da API na exceção adequada:
+     *  - 1005/1006 (falha interna/fornecedor offline) e 1007 que persistiu
+     *    após a retentativa → outage real do provedor (transient: true,
+     *    registra falha no circuito do ProviderRouter);
+     *  - 1000/1002/1003 (token/conta/blacklist) e 1001 (créditos esgotados)
+     *    → problema de configuração/conta: abrir o circuito não resolve
+     *    (transient: false), mas é logado como crítico para virar alerta
+     *    operacional antes de o cliente perceber;
+     *  - demais códigos ou sem código → falha de negócio por requisição
+     *    (documento não encontrado etc.), transient: false.
+     *
+     * @param  array{status: int, body: array<string, mixed>}  $response
+     */
+    private function unavailableFor(QueryType $type, array $response): ProviderUnavailable
+    {
+        $code = $this->errorCode($response['body']);
+
+        if (in_array($code, [1000, 1001, 1002, 1003], true)) {
+            $this->logger->critical('provider.account_error', [
+                'provider' => $this->identifier(),
+                'query_type' => $type->code,
+                'erro_codigo' => $code,
+                'erro' => $response['body']['erro'] ?? null,
+            ]);
+        }
+
+        return new ProviderUnavailable(
+            $this->identifier(),
+            transient: in_array($code, [1005, 1006, 1007], true),
+            context: [
+                'http_status' => $response['status'],
+                'body' => $response['body'],
+            ],
+        );
+    }
+
+    /**
+     * Extrai o "erroCodigo" transversal (1000..1007) do corpo, se presente.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function errorCode(array $body): ?int
+    {
+        return isset($body['erroCodigo']) && is_numeric($body['erroCodigo'])
+            ? (int) $body['erroCodigo']
+            : null;
     }
 
     /**
@@ -102,7 +163,7 @@ final readonly class CpfCnpjAdapter implements DataProviderPort
 
     /**
      * Demais parâmetros viram query string (ex.: pacote 4 por razão social:
-     * ?rzsocial=GOOGLE). "document" é tratado no path e removido daqui.
+     * ?razao_social=GOOGLE). "document" é tratado no path e removido daqui.
      *
      * @return array<string, mixed>
      */

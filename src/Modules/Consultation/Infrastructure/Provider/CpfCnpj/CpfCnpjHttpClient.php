@@ -28,7 +28,7 @@ final readonly class CpfCnpjHttpClient
     ) {}
 
     /**
-     * @param  array<string, mixed>  $query  parâmetros extras (ex.: rzsocial)
+     * @param  array<string, mixed>  $query  parâmetros extras (ex.: razao_social)
      * @return array{status: int, body: array<string, mixed>}
      */
     public function get(string $package, string $document, array $query = [], ?string $baseUrl = null, ?string $token = null): array
@@ -37,12 +37,19 @@ final readonly class CpfCnpjHttpClient
         $token = $token ?? $this->token;
 
         // Path: /{token}/{pacote}/{documento}. Quando não há documento (ex.:
-        // busca por razão social), mantém a barra final e usa a query string.
-        $url = implode('/', [
+        // busca por razão social), o path termina no pacote — sem barra
+        // final — e os parâmetros vão na query string.
+        $segments = [
             rtrim($baseUrl, '/'),
             rawurlencode($token),
             rawurlencode($package),
-        ]).'/'.($document !== '' ? rawurlencode($document) : '');
+        ];
+
+        if ($document !== '') {
+            $segments[] = rawurlencode($document);
+        }
+
+        $url = implode('/', $segments);
 
         try {
             $response = $this->http
