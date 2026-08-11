@@ -87,6 +87,11 @@ final class ConsultationParamsValidator
             return self::KIND_NONE;
         }
 
+        // Codes "ab_cpf_*" cujo produto na API Brasil consulta por CNPJ.
+        if (in_array($code, ClientConsultationCatalog::CNPJ_CODE_EXCEPTIONS, true)) {
+            return self::KIND_CNPJ;
+        }
+
         if (str_starts_with($code, 'cnpj') || str_starts_with($code, 'ab_cnpj')) {
             return self::KIND_CNPJ;
         }
