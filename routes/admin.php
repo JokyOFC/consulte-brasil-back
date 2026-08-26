@@ -24,6 +24,15 @@ Route::middleware(['auth', 'verified', 'role:admin', 'throttle:60,1'])
         Route::get('/accounts', [AccountsAdminController::class, 'index'])->name('accounts.index');
         Route::get('/accounts/{accountId}', [AccountsAdminController::class, 'show'])->name('accounts.show');
         Route::post('/accounts', [AccountsAdminController::class, 'store'])->name('accounts.store');
+        Route::put('/accounts/{accountId}', [AccountsAdminController::class, 'update'])
+            ->middleware(RequirePassword::class)
+            ->name('accounts.update');
+        Route::post('/accounts/{accountId}/users', [AccountsAdminController::class, 'storeUser'])
+            ->middleware(RequirePassword::class)
+            ->name('accounts.users.store');
+        Route::put('/accounts/{accountId}/users/{userId}', [AccountsAdminController::class, 'updateUser'])
+            ->middleware(RequirePassword::class)
+            ->name('accounts.users.update');
         Route::post('/accounts/{accountId}/adjust', [AccountsAdminController::class, 'adjustCredits'])
             ->middleware(RequirePassword::class)
             ->name('accounts.adjust');
