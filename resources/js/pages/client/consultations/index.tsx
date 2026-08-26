@@ -39,7 +39,7 @@ import { usePageFlash } from '@/hooks/use-page-flash';
 import { splitConsultationResult } from '@/lib/consultation-result';
 import { downloadBase64Pdf, findPdfAttachments, sanitizeResultForDisplay } from '@/lib/consultation-attachments';
 import { exportConsultationPdf } from '@/lib/export-consultation-pdf';
-import { formatBRL, formatDocument } from '@/lib/format';
+import { formatBRL, formatCep, formatDocument, formatPlate, isValidPlateOrChassis } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 interface QueryTypeRow {
@@ -51,6 +51,23 @@ interface QueryTypeRow {
     param_field: string;
     param_label: string;
     param_placeholder: string;
+    param_format: string;
+}
+
+/** Aplica a máscara adequada ao formato do parâmetro (vindo do catálogo). */
+function formatParamValue(format: string, value: string): string {
+    switch (format) {
+        case 'cpf':
+        case 'cnpj':
+        case 'document':
+            return formatDocument(value);
+        case 'plate':
+            return formatPlate(value);
+        case 'cep':
+            return formatCep(value);
+        default:
+            return value;
+    }
 }
 
 interface WalletInfo {
@@ -449,6 +466,10 @@ function ConsultationSheetForm({
     const form = useForm<Record<string, string>>({ [field]: '' });
     const insufficientBalance = wallet !== null && wallet.available < queryType.price_cents;
 
+    const paramValue = (form.data[field] ?? '').trim();
+    const plateInvalid = queryType.param_format === 'plate' && paramValue !== '' && !isValidPlateOrChassis(paramValue);
+    const canSubmit = paramValue !== '' && !plateInvalid;
+
     function handleSubmit() {
         form.post(`/client/consultations/${queryType.code}`, {
             preserveScroll: true,
@@ -457,12 +478,7 @@ function ConsultationSheetForm({
     }
 
     function handleChange(value: string) {
-        const formatted =
-            field === 'document' && queryType.param_field === 'document'
-                ? formatDocument(value)
-                : value;
-
-        form.setData(field, formatted);
+        form.setData(field, formatParamValue(queryType.param_format, value));
     }
 
     return (
@@ -495,12 +511,17 @@ function ConsultationSheetForm({
                         disabled={form.processing}
                         className="h-12 text-base"
                         onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !form.processing && !insufficientBalance && (form.data[field] ?? '').trim()) {
+                            if (event.key === 'Enter' && !form.processing && !insufficientBalance && canSubmit) {
                                 event.preventDefault();
                                 handleSubmit();
                             }
                         }}
                     />
+                    {queryType.param_format === 'plate' && (
+                        <p className={cn('text-xs', plateInvalid ? 'text-destructive' : 'text-muted-foreground')}>
+                            Placa no padrão antigo (ABC1234) ou Mercosul (ABC1D23) — também aceita chassi com 17 caracteres.
+                        </p>
+                    )}
                     <InputError message={form.errors[field]} />
                 </div>
 
@@ -516,7 +537,7 @@ function ConsultationSheetForm({
                 <Button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={form.processing || insufficientBalance || !(form.data[field] ?? '').trim()}
+                    disabled={form.processing || insufficientBalance || !canSubmit}
                     className="h-11 w-full"
                     size="lg"
                 >
