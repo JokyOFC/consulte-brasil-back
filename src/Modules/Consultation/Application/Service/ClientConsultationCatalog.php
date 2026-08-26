@@ -60,6 +60,7 @@ final readonly class ClientConsultationCatalog
      *     param_field: string,
      *     param_label: string,
      *     param_placeholder: string,
+     *     param_format: string,
      * }>
      */
     public function list(): array
@@ -111,6 +112,7 @@ final readonly class ClientConsultationCatalog
      *     param_field: string,
      *     param_label: string,
      *     param_placeholder: string,
+     *     param_format: string,
      * }
      */
     private function mapType(QueryTypeModel $type): array
@@ -126,6 +128,7 @@ final readonly class ClientConsultationCatalog
             'param_field' => $param['field'],
             'param_label' => $param['label'],
             'param_placeholder' => $param['placeholder'],
+            'param_format' => $param['format'],
         ];
     }
 
@@ -141,7 +144,10 @@ final readonly class ClientConsultationCatalog
     }
 
     /**
-     * @return array{field: string, label: string, placeholder: string}
+     * O `format` orienta a máscara/validação do input no painel:
+     * cpf | cnpj | document (CPF ou CNPJ) | plate (placa/chassi) | cep | text.
+     *
+     * @return array{field: string, label: string, placeholder: string, format: string}
      */
     private function resolveParam(string $code): array
     {
@@ -150,6 +156,7 @@ final readonly class ClientConsultationCatalog
                 'field' => 'razao_social',
                 'label' => 'Razão social',
                 'placeholder' => 'GOOGLE BRASIL',
+                'format' => 'text',
             ];
         }
 
@@ -158,6 +165,7 @@ final readonly class ClientConsultationCatalog
                 'field' => 'document',
                 'label' => 'CNPJ',
                 'placeholder' => '00.000.000/0000-00',
+                'format' => 'cnpj',
             ];
         }
 
@@ -166,22 +174,38 @@ final readonly class ClientConsultationCatalog
                 'field' => 'document',
                 'label' => 'CPF',
                 'placeholder' => '000.000.000-00',
+                'format' => 'cpf',
             ];
         }
 
-        if (str_starts_with($code, 'ab_veiculos') || str_starts_with($code, 'ab_fipe')) {
+        // Busca veículos de uma PF/PJ: o identificador é o CPF/CNPJ do
+        // proprietário, não a placa (body_key "documento" na API Brasil).
+        if ($code === 'ab_veiculos_busca_documento') {
+            return [
+                'field' => 'document',
+                'label' => 'CPF ou CNPJ',
+                'placeholder' => '000.000.000-00',
+                'format' => 'document',
+            ];
+        }
+
+        if (str_starts_with($code, 'ab_veiculos')) {
             return [
                 'field' => 'document',
                 'label' => 'Placa ou chassi',
                 'placeholder' => 'ABC1D23',
+                'format' => 'plate',
             ];
         }
 
-        if (str_starts_with($code, 'ab_cep')) {
+        // "ab_cep" consulta por CEP; os demais do grupo recebem DDD, cidade ou
+        // UF — entrada livre, sem máscara numérica.
+        if ($code === 'ab_cep') {
             return [
                 'field' => 'document',
                 'label' => 'CEP',
                 'placeholder' => '01310-100',
+                'format' => 'cep',
             ];
         }
 
@@ -189,6 +213,7 @@ final readonly class ClientConsultationCatalog
             'field' => 'document',
             'label' => 'Documento / identificador',
             'placeholder' => 'Informe o valor solicitado',
+            'format' => 'text',
         ];
     }
 
