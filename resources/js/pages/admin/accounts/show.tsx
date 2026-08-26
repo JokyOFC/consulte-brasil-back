@@ -4,11 +4,14 @@ import {
     ArrowLeft,
     CreditCard,
     KeyRound,
+    Pencil,
     TrendingUp,
+    UserPlus,
     Users,
     Wallet,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import type { FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Area,
     CartesianGrid,
@@ -35,7 +38,17 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -46,8 +59,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePageFlash } from '@/hooks/use-page-flash';
-import { formatBRL } from '@/lib/format';
 import { formatDate, formatDateTime } from '@/lib/datetime';
+import { formatBRL } from '@/lib/format';
 
 interface Account {
     id: string;
@@ -105,6 +118,7 @@ interface UserRow {
     id: number;
     name: string;
     email: string;
+    phone: string | null;
     role: string;
     created_at: string | null;
 }
@@ -202,6 +216,7 @@ export default function AdminAccountShow({
                     description={`${account.document_type.toUpperCase()} ${account.document}`}
                     actions={
                         <div className="flex flex-wrap gap-2">
+                            <EditAccountDialog account={account} />
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={`/admin/logs?account_id=${account.id}`}>
                                     <KeyRound /> Logs de API
@@ -361,7 +376,7 @@ export default function AdminAccountShow({
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     <ApiKeysCard apiKeys={api_keys} />
-                    <UsersCard users={users} />
+                    <UsersCard accountId={account.id} users={users} />
                 </div>
 
                 <Card className="gap-0 py-0">
@@ -597,17 +612,87 @@ function ApiKeysCard({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
     );
 }
 
-function UsersCard({ users }: { users: UserRow[] }) {
+function EditAccountDialog({ account }: { account: Account }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({ name: account.name, status: account.status });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.put(`/admin/accounts/${account.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setOpen(false),
+        });
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+
+                if (next) {
+                    form.setData({ name: account.name, status: account.status });
+                    form.clearErrors();
+                }
+            }}
+        >
+            <DialogTrigger asChild>
+                <Button size="sm"><Pencil /> Editar cliente</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar cliente</DialogTitle>
+                    <DialogDescription>
+                        {account.document_type.toUpperCase()} {account.document} — o documento não pode ser alterado.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-acc-name">Nome / Razão social</Label>
+                        <Input
+                            id="edit-acc-name"
+                            value={form.data.name}
+                            onChange={(e) => form.setData('name', e.target.value)}
+                            required
+                        />
+                        {form.errors.name && <p className="text-sm text-destructive">{form.errors.name}</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select value={form.data.status} onValueChange={(v) => form.setData('status', v)}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="active">Ativa</SelectItem>
+                                <SelectItem value="suspended">Suspensa</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {form.errors.status && <p className="text-sm text-destructive">{form.errors.status}</p>}
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" disabled={form.processing}>Salvar alterações</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function UsersCard({ accountId, users }: { accountId: string; users: UserRow[] }) {
     return (
         <Card className="gap-0 py-0">
-            <CardHeader className="border-b border-border py-4">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border py-4">
                 <CardTitle className="flex items-center gap-2 text-base">
                     <Users className="size-4" /> Usuários vinculados
                 </CardTitle>
+                <CreateUserDialog accountId={accountId} />
             </CardHeader>
             <CardContent className="p-0">
                 {users.length === 0 ? (
-                    <p className="px-6 py-8 text-center text-sm text-muted-foreground">Nenhum usuário vinculado.</p>
+                    <p className="px-6 py-8 text-center text-sm text-muted-foreground">
+                        Nenhum usuário vinculado. Crie um acesso para o cliente entrar no painel.
+                    </p>
                 ) : (
                     <ul className="divide-y divide-border">
                         {users.map((user) => (
@@ -622,12 +707,169 @@ function UsersCard({ users }: { users: UserRow[] }) {
                                     <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                                 </div>
                                 <Badge variant="outline" className="shrink-0 capitalize">{user.role}</Badge>
+                                <EditUserDialog accountId={accountId} user={user} />
                             </li>
                         ))}
                     </ul>
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+interface UserFormData {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    [key: string]: string;
+}
+
+function CreateUserDialog({ accountId }: { accountId: string }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm<UserFormData>({ name: '', email: '', phone: '', password: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/admin/accounts/${accountId}/users`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                setOpen(false);
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm"><UserPlus /> Novo usuário</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Novo usuário de acesso</DialogTitle>
+                    <DialogDescription>
+                        Cria o login (email e senha) com que o cliente acessa o painel.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <UserFormFields form={form} idPrefix="create-user" passwordLabel="Senha" passwordRequired />
+                    <DialogFooter>
+                        <Button type="submit" disabled={form.processing}>Criar usuário</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditUserDialog({ accountId, user }: { accountId: string; user: UserRow }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm<UserFormData>({ name: user.name, email: user.email, phone: user.phone ?? '', password: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.put(`/admin/accounts/${accountId}/users/${user.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.setData('password', '');
+                setOpen(false);
+            },
+        });
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+
+                if (next) {
+                    form.setData({ name: user.name, email: user.email, phone: user.phone ?? '', password: '' });
+                    form.clearErrors();
+                }
+            }}
+        >
+            <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0" aria-label={`Editar ${user.name}`}>
+                    <Pencil />
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar usuário</DialogTitle>
+                    <DialogDescription>
+                        Altere os dados de acesso. Deixe a senha em branco para mantê-la.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <UserFormFields form={form} idPrefix={`edit-user-${user.id}`} passwordLabel="Nova senha (opcional)" />
+                    <DialogFooter>
+                        <Button type="submit" disabled={form.processing}>Salvar alterações</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function UserFormFields({
+    form,
+    idPrefix,
+    passwordLabel,
+    passwordRequired = false,
+}: {
+    form: ReturnType<typeof useForm<UserFormData>>;
+    idPrefix: string;
+    passwordLabel: string;
+    passwordRequired?: boolean;
+}) {
+    return (
+        <>
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-name`}>Nome</Label>
+                <Input
+                    id={`${idPrefix}-name`}
+                    value={form.data.name}
+                    onChange={(e) => form.setData('name', e.target.value)}
+                    required
+                />
+                {form.errors.name && <p className="text-sm text-destructive">{form.errors.name}</p>}
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-email`}>Email</Label>
+                <Input
+                    id={`${idPrefix}-email`}
+                    type="email"
+                    value={form.data.email}
+                    onChange={(e) => form.setData('email', e.target.value)}
+                    required
+                />
+                {form.errors.email && <p className="text-sm text-destructive">{form.errors.email}</p>}
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-phone`}>Telefone (opcional)</Label>
+                <Input
+                    id={`${idPrefix}-phone`}
+                    value={form.data.phone}
+                    onChange={(e) => form.setData('phone', e.target.value)}
+                    placeholder="(11) 99999-9999"
+                />
+                {form.errors.phone && <p className="text-sm text-destructive">{form.errors.phone}</p>}
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-password`}>{passwordLabel}</Label>
+                <Input
+                    id={`${idPrefix}-password`}
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.data.password}
+                    onChange={(e) => form.setData('password', e.target.value)}
+                    required={passwordRequired}
+                />
+                {form.errors.password && <p className="text-sm text-destructive">{form.errors.password}</p>}
+            </div>
+        </>
     );
 }
 

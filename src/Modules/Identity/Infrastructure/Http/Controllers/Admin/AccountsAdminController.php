@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Src\Modules\Identity\Infrastructure\Http\Controllers\Admin;
 
-use App\Support\Dates;
 use App\Models\User;
 use App\Rules\ValidDocument;
+use App\Support\Dates;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 use Src\Modules\Billing\Application\UseCase\AdjustCredits;
@@ -20,7 +22,12 @@ use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\CreditTransac
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\PaymentModel;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
 use Src\Modules\Identity\Application\DTO\CreateAccountInput;
+use Src\Modules\Identity\Application\DTO\UpdateAccountInput;
 use Src\Modules\Identity\Application\UseCase\CreateAccount;
+use Src\Modules\Identity\Application\UseCase\UpdateAccount;
+use Src\Modules\Identity\Domain\Exception\AccountNotFound;
+use Src\Modules\Identity\Domain\ValueObject\AccountStatus;
+use Src\Modules\Identity\Domain\ValueObject\Role;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Src\Modules\Identity\Infrastructure\Persistence\Eloquent\Models\ApiKeyModel;
 
@@ -148,11 +155,12 @@ final class AccountsAdminController
             'users' => User::query()
                 ->where('account_id', $accountId)
                 ->orderBy('name')
-                ->get(['id', 'name', 'email', 'role', 'created_at'])
+                ->get(['id', 'name', 'email', 'phone', 'role', 'created_at'])
                 ->map(fn (User $user) => [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'phone' => $user->phone,
                     'role' => $user->role,
                     'created_at' => Dates::toFrontendIso($user->created_at),
                 ])
@@ -266,6 +274,86 @@ final class AccountsAdminController
         $createAccount->handle(new CreateAccountInput($data['name'], $data['document']));
 
         return back()->with('success', 'Conta criada com sucesso.');
+    }
+
+    public function update(string $accountId, Request $request, UpdateAccount $updateAccount): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'status' => ['required', Rule::enum(AccountStatus::class)],
+        ]);
+
+        try {
+            $updateAccount->handle(new UpdateAccountInput(
+                accountId: $accountId,
+                name: $data['name'],
+                status: AccountStatus::from($data['status']),
+            ));
+        } catch (AccountNotFound) {
+            abort(404);
+        }
+
+        return back()->with('success', 'Dados do cliente atualizados.');
+    }
+
+    public function storeUser(string $accountId, Request $request): RedirectResponse
+    {
+        AccountModel::query()->findOrFail($accountId);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class)],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'password' => ['required', 'string', Password::default()],
+        ]);
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+            'password' => $data['password'],
+        ]);
+
+        // Criado pelo admin já nasce verificado: o painel exige 'verified' e
+        // este caminho não dispara o email de verificação do registro.
+        $user->forceFill([
+            'account_id' => $accountId,
+            'role' => Role::Client->value,
+            'email_verified_at' => now(),
+        ])->save();
+
+        return back()->with('success', 'Usuário criado e vinculado à conta.');
+    }
+
+    public function updateUser(string $accountId, string $userId, Request $request): RedirectResponse
+    {
+        // Escopo pela conta + papel client: impede editar usuários de outros
+        // tenants (ou admins) trocando o id na URL.
+        $user = User::query()
+            ->where('account_id', $accountId)
+            ->where('role', Role::Client->value)
+            ->findOrFail($userId);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'password' => ['nullable', 'string', Password::default()],
+        ]);
+
+        $user->fill([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+        ]);
+
+        if (($data['password'] ?? '') !== '') {
+            $user->password = $data['password'];
+        }
+
+        $user->save();
+
+        return back()->with('success', 'Usuário atualizado.');
     }
 
     public function adjustCredits(string $accountId, Request $request, AdjustCredits $adjust): RedirectResponse
