@@ -77,7 +77,10 @@ database/             # Migrations e seeders
 
 Com a aplicação rodando, a documentação interativa (Scalar) fica disponível em `/docs/api`.
 
+- [Sistema completo (endpoints e comportamento)](docs/sistema.md)
 - [Webhook de consultas](docs/webhook.md) — notificações de saída, payload, assinatura HMAC e configuração
+- [Antecedentes criminais (`cpf_cac`)](docs/antecedentes-criminais.md)
+- [Faturas e suporte](docs/minhas-faturas-e-suporte.md)
 
 ## Licença
 
