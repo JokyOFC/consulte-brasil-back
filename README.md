@@ -20,6 +20,7 @@ A aplicação segue arquitetura modular em `src/Modules/`:
 | **Consultation** | Execução de consultas e integração com provedores de dados |
 | **Provider** | Gestão de provedores externos (API Brasil, CPF.CNPJ, etc.) |
 | **Audit** | Registro de eventos e auditoria |
+| **Support** | Tickets de suporte, anexos e e-mails |
 
 ## Pré-requisitos
 

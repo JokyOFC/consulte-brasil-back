@@ -1,8 +1,10 @@
 # Consulte Brasil — Documentação completa do sistema
 
-Este documento descreve o que a plataforma faz, todos os endpoints HTTP (API pública e painel web) e os processos de fundo. Valores de preço no catálogo de consultas são **custo do provedor**; o preço cobrado do cliente é esse custo **mais 10% de margem**, e pode ser alterado no painel admin. Sempre use `GET /api/v1/services` ou o campo `amount_charged` da resposta para o valor vigente.
+Este documento descreve o que a plataforma faz, todos os endpoints HTTP (API pública e painel web), o modelo de dados, o frontend, segurança e os processos de fundo. Valores de preço no catálogo de consultas são **custo do provedor**; o preço cobrado do cliente é esse custo **mais 10% de margem**, e pode ser alterado no painel admin. Sempre use `GET /api/v1/services` ou o campo `amount_charged` da resposta para o valor vigente.
 
 Documentação interativa (OpenAPI / Scalar): **`/docs/api`** (login no painel). JSON: **`/docs/api.json`**.
+
+Sumário: [1 sistema](#1-o-que-o-sistema-faz) · [2 autenticação](#2-autenticação) · [3 erros](#3-envelope-de-erros-api) · [4 API](#4-api-pública-apiv1) · [5 catálogo](#5-catálogo-de-tipos-de-consulta) · [6 painel](#6-painel-web) · [7 billing](#7-billing-comportamento) · [8 webhook](#8-webhook-de-saída-consultas) · [9 auditoria](#9-auditoria-e-lgpd) · [10 Artisan](#10-comandos-artisan-e-agenda) · [11 e-mails](#11-e-mails-transacionais) · [12 env](#12-variáveis-de-ambiente-relevantes) · [13 testes](#13-testes-e-qualidade) · [14 arquitetura](#14-arquitetura-e-estrutura-de-pastas) · [15 dados](#15-modelo-de-dados) · [16 provedores](#16-provedores-failover-e-circuit-breaker) · [17 identidade](#17-identidade-em-detalhe) · [18 billing detalhado](#18-billing-em-detalhe) · [19 frontend](#19-frontend-páginas-e-navegação) · [20 segurança](#20-segurança) · [21 eventos](#21-eventos-jobs-e-e-mails) · [22 seeders](#22-seeders-e-dados-iniciais) · [23 operação](#23-operação-e-ci)
 
 Complementos:
 
@@ -567,4 +569,251 @@ composer test        # PHPUnit + Pint
 composer ci:check    # ESLint, Prettier, TypeScript e testes
 ```
 
-Coleção Postman: `postman/Consulte-Brasil-API.postman_collection.json`.
+Coleção Postman: `postman/Consulte-Brasil-API.postman_collection.json`. Ambiente local: `postman/Consulte-Brasil-Local.postman_environment.json`.
+
+CI: `.github/workflows/tests.yml` e `lint.yml`.
+
+---
+
+## 14. Arquitetura e estrutura de pastas
+
+A aplicação é um backend Laravel com **bounded contexts** em `src/Modules/` (DDD). Cada módulo tem:
+
+| Camada | Pasta | Conteúdo |
+|--------|-------|----------|
+| Domain | `Domain/` | Entidades, value objects, eventos, exceções, portas |
+| Application | `Application/` | Use cases, DTOs, serviços de orquestração |
+| Infrastructure | `Infrastructure/` | HTTP, Eloquent, jobs, adapters de provedor, console |
+
+O kernel compartilhado fica em `src/Shared/` (UUID, relógio, event bus, CPF/CNPJ, e-mail transacional).
+
+O Laravel clássico em `app/` cobre Fortify, middlewares globais, e-mails, settings e o dashboard.
+
+```
+app/                      Kernel, Fortify, mail, settings, middlewares
+bootstrap/                app.php (rotas, exceptions, middleware)
+config/                   Laravel + consultation, audit, scramble, fortify
+database/                 migrations globais, seeders, factories
+docs/                     Esta documentação
+postman/                  Collection da API pública
+public/                   Front controller
+resources/js/             React + Inertia (páginas, hooks, tipos)
+resources/views/          Blade (app, e-mails, Scalar)
+routes/                   web, api, admin, client, settings, console
+src/Modules/              Identity, Billing, Consultation, Provider, Audit, Support
+src/Shared/               Contratos e utilitários de domínio
+tests/                    Feature e Unit (PHPUnit)
+```
+
+Rotas da API de cada módulo: `src/Modules/*/Infrastructure/Http/routes.php`, carregadas automaticamente por `routes/api.php` sob `/api/v1`.
+
+---
+
+## 15. Modelo de dados
+
+IDs de domínio são UUID. Timestamps de logs/consultas podem ser tratados como UTC na UI (`APP_DISPLAY_TIMEZONE`).
+
+| Tabela | Módulo | Função |
+|--------|--------|--------|
+| `users` | Auth | Usuário do painel (e-mail, senha, 2FA, `account_id`, `role`, último login) |
+| `accounts` | Identity | Tenant (nome, documento, status, `webhook_url`, `webhook_secret` cifrado) |
+| `api_keys` | Identity | Prefixo, hash SHA-256, últimos 4 dígitos, status, expiração |
+| `passkeys` | Fortify | Credenciais WebAuthn |
+| `wallets` | Billing | `balance` e `reserved` em centavos |
+| `credit_transactions` | Billing | Extrato (`grant`, `reserve`, `commit`, `refund`, `expire`, `adjustment`) |
+| `plans` | Billing | Catálogo de assinatura |
+| `subscriptions` | Billing | Assinatura da conta (status, próximo faturamento, snapshot de preço) |
+| `payments` | Billing | Pagamentos Mercado Pago (PIX/cartão/boleto) |
+| `invoices` / `invoice_items` | Billing | Faturas (`FAT-{ano}-{seq}`) |
+| `query_types` | Consultation | Código, nome, preço default, TTL de cache, status |
+| `consultations` | Consultation | Histórico: tipo, status, custo, hash do request, latência (sem payload em claro) |
+| `providers` | Provider | `api_brasil`, `cpfcnpj`, `mercado_pago` (ambiente sandbox/produção) |
+| `provider_capabilities` | Provider | Tipo × provedor: prioridade, `cost_cents`, `price_cents`, config JSON |
+| `request_logs` | Audit | Request/response cifrados (`encrypted:array`), duração, status |
+| `support_tickets` (+ mensagens/anexos) | Support | Chamados |
+| `settings` | App | Chave/valor (ex.: timeout de sessão) |
+| `jobs` / `failed_jobs` / `cache` | Laravel | Fila e cache |
+
+### 15.1 Status importantes
+
+| Conceito | Valores |
+|----------|---------|
+| Consulta | `success`, `failed`, `refunded` |
+| Conta | `active` (e equivalentes de domínio; API key só autentica conta ativa) |
+| API key | ativa / revogada / expirada (`isUsable`) |
+| Papel | `admin`, `client` |
+| Fatura | `open`, `overdue`, `paid`, `canceled` |
+| Pagamento | pendente / processando / aprovado / rejeitado / cancelado (domínio `PaymentStatus`) |
+| Método de pagamento | `pix`, `credit_card`, `boleto` |
+| Ticket | aberto → em andamento → encerrado |
+| Provedor | enabled/disabled + `sandbox` / `production` |
+| Tipo de consulta | `active` (só ativos com capability ligada entram no catálogo público) |
+
+---
+
+## 16. Provedores, failover e circuit breaker
+
+Três registros em `providers`:
+
+| Identifier | Papel |
+|------------|--------|
+| `api_brasil` | Consultas (prioridade menor = tenta primeiro nos tipos `cpf`/`cnpj` do seeder: 1 e 2) |
+| `cpfcnpj` | Consultas (failover nos tipos básicos: prioridade 10 e 11). Catálogo completo via pacotes |
+| `mercado_pago` | Só ambiente do gateway de pagamento (sem capabilities de consulta) |
+
+`ProviderRouter`:
+
+1. Lista capabilities **enabled** do tipo, ordenadas por prioridade.
+2. Pula provedor com **circuit breaker aberto**.
+3. Primeiro sucesso fecha o circuito.
+4. Falha transitória (timeout/5xx) incrementa falhas; 5 falhas em 120 s abrem o circuito por 60 s.
+5. Documento não encontrado / erro de negócio do provedor **não** abre o circuito (não é outage).
+6. Se ninguém atende → `AllProvidersFailed` → estorno.
+
+Adapters: `CpfCnpjAdapter` (pacote no `config` da capability) e `ApiBrasilAdapter` (endpoint, DeviceToken por grupo, timeout maior em rotas `/credits`).
+
+Ambiente sandbox usa tokens de teste (`*_SANDBOX_TOKEN`) e não deve consumir crédito real do provedor até o admin promover para produção.
+
+---
+
+## 17. Identidade em detalhe
+
+- Guard `web`: sessão (Fortify).
+- Guard `api`: driver `api-key` (`Auth::viaRequest` no IdentityServiceProvider). O `user()` da API é o **AccountModel**, não o User.
+- Token: `cb_live_` + segredo. Lookup pelo **prefixo** (label + 8 caracteres) + verificação SHA-256 do restante. Painel mostra só os 4 últimos dígitos.
+- Token em texto claro só no create (flash `plain_token`) ou no Artisan `identity:issue-key`.
+- Webhook secret cifrado com `APP_KEY`; flash `plain_secret` na primeira vez / regeneração.
+- Registro exige CPF/CNPJ válido (`ValidDocument`) e aceite de termos.
+- Excluir perfil (`DELETE /settings/profile`) faz logout.
+
+---
+
+## 18. Billing em detalhe
+
+Planos seedados (mensais):
+
+| Slug | Nome | Preço | Saldo incluso |
+|------|------|-------|----------------|
+| `starter` | Starter | R$ 49,00 | R$ 100,00 |
+| `growth` | Growth | R$ 149,00 | R$ 500,00 |
+| `scale` | Scale | R$ 499,00 | R$ 2.000,00 |
+
+Fluxos no painel Financeiro:
+
+- Recarga avulsa (`topup`) gera `Payment` e instruções PIX/boleto ou tokenização de cartão (SDK MP no browser, CSP libera `sdk.mercadopago.com`).
+- Polling em `GET /client/billing/payments/{id}/status`.
+- PIX expira em `MP_PIX_EXPIRATION_MINUTES` (padrão 30). Boleto em `MP_BOLETO_EXPIRATION_DAYS` (padrão 3).
+- Assinar plano credita `included_balance` e agenda ciclo.
+- Cancelar fatura: se houver PIX/boleto pendente, espera **120 s** (`CancelInvoice::CANCEL_GRACE_SECONDS`) e sincroniza o MP antes; se já aprovado, não cancela.
+- Ajuste admin: transação `adjustment` (exige senha).
+- `billing:run-recurring`: marca overdue e gera faturas de renovação.
+
+---
+
+## 19. Frontend: páginas e navegação
+
+SPA Inertia + React + TypeScript + Tailwind (`resources/js/pages`).
+
+**Menu cliente:** Painel, Consultas, Financeiro, Minhas Faturas, Suporte, Minhas chaves, Webhook, Logs.
+
+**Menu admin:** Painel, Clientes, Financeiro, Planos, Tickets, Tipos de consulta, Provedores, Logs, Configurações.
+
+Rodapé: link para `/docs/api`. Badge de tickets não lidos (cliente e admin).
+
+Páginas de auth: login, registro, forgot/reset password, verify-email, 2FA challenge, confirm-password.
+
+Consultas no painel: formulário por tipo (`document` ou `razao_social`); resultado em sessão (`consultation_result`); exportação PDF no cliente (`export-consultation-pdf.ts`); anexos/base64 quando o resultado traz certidão.
+
+Hooks relevantes: `use-session-timeout` (inatividade alinhada ao admin), `use-flash-toast`, `use-two-factor-auth`, `use-clipboard`.
+
+Props globais Inertia: usuário, timeout, flash (`success`/`error`/`plain_token`/`plain_secret`/`payment`), timezone, URL do site de marketing, `adminShell` (consumo no header admin).
+
+---
+
+## 20. Segurança
+
+- Headers: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP, HSTS em produção, CSP (relaxada em `docs/*` e local por causa do Vite/Scalar).
+- CSRF nas mutações web.
+- Rate limit nas rotas críticas (API, consultas do painel, billing, login).
+- Senha confirmada em: ajuste de créditos, atribuição de plano, update de provedor/capabilities, settings admin, tela de segurança.
+- Auditoria: corpos/headers/respostas de `request_logs` **cifrados**; CPF/CNPJ mascarados se `AUDIT_MASK_DOCUMENTS=true` (padrão). Cartão/credenciais sempre mascarados.
+- Consultas persistem só `request_hash`, não o documento em claro; purge após 180 dias.
+- Timeout de sessão: default **120 min**, intervalo 1–1440, persistido em `settings`. `SESSION_LIFETIME` no `.env` deve ser ≥ o máximo admin (1440).
+- API key e webhook secret nunca voltam em `GET` depois de emitidos.
+
+---
+
+## 21. Eventos, jobs e e-mails
+
+| Evento | Listener | Efeito |
+|--------|----------|--------|
+| `Registered` (Fortify) | `SendWelcomeEmail` | E-mail de boas-vindas |
+| `Login` | `SendLoginAlertEmail` | Alerta se IP/UA mudou |
+| `AccountRegistered` | `ProvisionWalletForAccount` | Cria carteira zerada |
+| `PaymentSettled` | `SendPaymentConfirmedEmail` | Recibo de pagamento |
+| `ConsultationCompleted` | `DispatchConsultationWebhook` | Enfileira `DeliverConsultationWebhookJob` |
+
+Job de webhook: 3 tentativas, backoff 30 / 120 / 300 s, timeout HTTP 10 s, `User-Agent: ConsulteBrasil-Webhook/1.0`.
+
+E-mails (fila): welcome, verify-email, login-alert, payment-confirmed, ticket opened / reply / status. Layout em `resources/views/mail/`.
+
+Canal de log `consultation` para falhas de entrega do webhook.
+
+---
+
+## 22. Seeders e dados iniciais
+
+`php artisan db:seed` (via `DatabaseSeeder`):
+
+- Usuário admin `admin@consultebrasil.test` / senha `password` (só desenvolvimento).
+- Planos Starter / Growth / Scale.
+- Tipos `cpf` e `cnpj` básicos + catálogos CPF.CNPJ e API Brasil.
+- Provedores `api_brasil`, `cpfcnpj` (sandbox), `mercado_pago` (sandbox).
+
+Comando `catalog:reprice` realinha `cost_cents`/`price_cents` aos seeders + margem.
+
+---
+
+## 23. Operação e CI
+
+Scripts Composer:
+
+| Comando | O que faz |
+|---------|-----------|
+| `composer setup` | install, `.env`, `key:generate`, migrate, npm build |
+| `composer dev` | `artisan serve` + `queue:listen` + Vite |
+| `composer test` | Pint + PHPUnit |
+| `composer ci:check` | ESLint, Prettier, TypeScript + testes |
+
+Produção: `queue:work`, `schedule:work` (ou cron `* * * * * php artisan schedule:run`), `queue:restart` após deploy. Redis recomendado para cache de saldo, circuit breaker e cache de consultas.
+
+Health:
+
+- `GET /up` — Laravel
+- `GET /api/v1/ping` — API de negócio
+
+Fuso: `APP_TIMEZONE` (jobs/métricas) e `APP_DISPLAY_TIMEZONE` (telas). Padrão `America/Sao_Paulo`.
+
+Site institucional: `MARKETING_SITE_URL` (link no painel).
+
+---
+
+## 24. Variáveis de ambiente (lista estendida)
+
+Além da tabela da [seção 12](#12-variáveis-de-ambiente-relevantes):
+
+| Chave | Uso |
+|-------|-----|
+| `MARKETING_SITE_URL` | URL do site comercial |
+| `APP_TIMEZONE` / `APP_DISPLAY_TIMEZONE` | Fuso app vs. UI |
+| `AUDIT_MASK_DOCUMENTS` | Máscara de CPF/CNPJ nos logs (true em produção) |
+| `SESSION_LIFETIME` | Cookie de sessão (minutos; ≥ timeout admin) |
+| `CACHE_STORE` / `REDIS_*` | Cache (circuit breaker, saldo, consultas) |
+| `API_BRASIL_TIMEOUT` / `API_BRASIL_CREDIT_TIMEOUT` | Timeouts HTTP (crédito/bureau até 45 s) |
+| `API_BRASIL_DEVICE_TOKEN_*` | DeviceToken por grupo (cpf, cnpj, vehicles, cep, …) |
+| `CPFCNPJ_TIMEOUT` / `CPFCNPJ_PACKAGE_*` | Timeout e pacotes default |
+| `MP_PUBLIC_KEY` / `MP_SANDBOX_PUBLIC_KEY` | SDK no browser |
+| `MP_PIX_EXPIRATION_MINUTES` / `MP_BOLETO_EXPIRATION_DAYS` | Validade das cobranças |
+
+Lista comentada completa: `.env.example`.
+
