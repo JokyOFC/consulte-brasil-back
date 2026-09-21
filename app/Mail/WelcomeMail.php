@@ -33,6 +33,9 @@ final class WelcomeMail extends BrandedMailable
         return [
             'userName' => $this->user->name,
             'dashboardUrl' => url('/dashboard'),
+            // Só pede para confirmar o email quando a confirmação está em vigor.
+            'mustVerifyEmail' => $this->user->emailVerificationRequired()
+                && ! $this->user->hasVerifiedEmail(),
         ];
     }
 }

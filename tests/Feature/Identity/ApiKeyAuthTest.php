@@ -81,4 +81,62 @@ final class ApiKeyAuthTest extends TestCase
             ->getJson('/api/v1/me')
             ->assertUnauthorized();
     }
+
+    public function test_multiple_active_keys_on_same_account_all_authenticate(): void
+    {
+        $account = app(CreateAccount::class)->handle(
+            new CreateAccountInput('ACME Ltda', '11.222.333/0001-81')
+        );
+
+        $tokens = [];
+        foreach (['integração ERP', 'site', 'backoffice'] as $name) {
+            $tokens[$name] = app(IssueApiKey::class)->handle(
+                new IssueApiKeyInput($account->id->value, $name)
+            )->plainToken;
+        }
+
+        foreach ($tokens as $name => $token) {
+            $this->withToken($token)
+                ->getJson('/api/v1/me')
+                ->assertOk()
+                ->assertJsonPath('data.id', $account->id->value);
+        }
+    }
+
+    public function test_issuing_new_key_keeps_previous_keys_working(): void
+    {
+        $account = app(CreateAccount::class)->handle(
+            new CreateAccountInput('ACME Ltda', '11.222.333/0001-81')
+        );
+
+        $first = app(IssueApiKey::class)->handle(
+            new IssueApiKeyInput($account->id->value, 'primeira')
+        )->plainToken;
+
+        app(IssueApiKey::class)->handle(new IssueApiKeyInput($account->id->value, 'segunda'));
+
+        $this->withToken($first)
+            ->getJson('/api/v1/me')
+            ->assertOk();
+    }
+
+    public function test_revoking_one_key_keeps_the_others_working(): void
+    {
+        $account = app(CreateAccount::class)->handle(
+            new CreateAccountInput('ACME Ltda', '11.222.333/0001-81')
+        );
+
+        $kept = app(IssueApiKey::class)->handle(
+            new IssueApiKeyInput($account->id->value, 'mantida')
+        )->plainToken;
+
+        $revoked = app(IssueApiKey::class)->handle(
+            new IssueApiKeyInput($account->id->value, 'revogada')
+        );
+
+        app(RevokeApiKey::class)->handle($account->id->value, $revoked->apiKey->id->value);
+
+        $this->withToken($revoked->plainToken)->getJson('/api/v1/me')->assertUnauthorized();
+        $this->withToken($kept)->getJson('/api/v1/me')->assertOk();
+    }
 }

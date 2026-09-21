@@ -1,17 +1,21 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowLeft,
+    Check,
+    Copy,
     CreditCard,
     KeyRound,
     Pencil,
+    QrCode,
+    Receipt,
     TrendingUp,
     UserPlus,
     Users,
     Wallet,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Area,
     CartesianGrid,
@@ -140,6 +144,27 @@ interface PaymentRow {
     amount_cents: number;
     created_at: string | null;
     paid_at: string | null;
+    /** Presente só para PIX ainda pendente (reabrível pelo admin). */
+    pix: { qr_code: string; qr_code_base64: string | null } | null;
+}
+
+interface OpenInvoiceRow {
+    id: string;
+    number: string | null;
+    status: string;
+    amount_cents: number;
+    description: string | null;
+    due_date: string | null;
+}
+
+/** Cobrança PIX exibida no diálogo (recém-gerada via flash ou reaberta da tabela). */
+interface PixCharge {
+    id: string;
+    status: string;
+    amount_cents: number;
+    qr_code: string | null;
+    qr_code_base64: string | null;
+    expires_at: string | null;
 }
 
 interface CreditTxRow {
@@ -154,6 +179,7 @@ interface CreditTxRow {
 interface PlanOption {
     id: string;
     name: string;
+    price_cents: number;
     included_credits: number;
 }
 
@@ -169,9 +195,22 @@ interface Props {
     recent_payments: PaymentRow[];
     credit_transactions: CreditTxRow[];
     plans: PlanOption[];
+    open_invoices: OpenInvoiceRow[];
+    payer_email: string | null;
 }
 
 const brlTick = (v: number) => formatBRL(v);
+
+/** Props recarregadas quando um PIX é pago (saldo, assinatura, faturas…). */
+const BILLING_PROPS = [
+    'wallet',
+    'stats',
+    'subscription',
+    'daily',
+    'recent_payments',
+    'credit_transactions',
+    'open_invoices',
+];
 
 export default function AdminAccountShow({
     account,
@@ -185,10 +224,35 @@ export default function AdminAccountShow({
     recent_payments,
     credit_transactions,
     plans,
+    open_invoices,
+    payer_email,
 }: Props) {
     usePageFlash();
     const isMobile = useIsMobile();
     const chartLayout = moneyChartLayout(isMobile);
+
+    // Email do pagador compartilhado por todas as cobranças PIX desta tela.
+    const [payerEmail, setPayerEmail] = useState(payer_email ?? '');
+
+    // Diálogo do PIX: abre sozinho com a cobrança recém-gerada (flash da sessão)
+    // ou quando o admin reabre um PIX pendente pela tabela de pagamentos.
+    const { flash, errors } = usePage<{
+        flash?: { payment?: PixCharge | null };
+        errors?: Record<string, string>;
+    }>().props;
+    const flashPayment = flash?.payment ?? null;
+    const [reopenedCharge, setReopenedCharge] = useState<PixCharge | null>(null);
+    const [dismissedChargeId, setDismissedChargeId] = useState<string | null>(null);
+    const pixCharge =
+        reopenedCharge ?? (flashPayment && flashPayment.id !== dismissedChargeId ? flashPayment : null);
+
+    const closePixDialog = () => {
+        setReopenedCharge(null);
+        setDismissedChargeId(flashPayment?.id ?? null);
+    };
+
+    const hasActiveSubscription =
+        subscription !== null && ['active', 'past_due'].includes(subscription.status);
 
     const dailyChart = useMemo(
         () => daily.map((point) => ({ ...point, label: formatChartDayLabel(point.date) })),
@@ -369,10 +433,20 @@ export default function AdminAccountShow({
                     </Card>
 
                     <div className="space-y-6">
-                        <AccountOpsCard accountId={account.id} wallet={wallet} plans={plans} />
-                        <SubscriptionCard subscription={subscription} />
+                        <AccountOpsCard
+                            accountId={account.id}
+                            wallet={wallet}
+                            plans={plans}
+                            hasActiveSubscription={hasActiveSubscription}
+                            payerEmail={payerEmail}
+                            onPayerEmailChange={setPayerEmail}
+                            payerEmailError={errors?.payer_email}
+                        />
+                        <SubscriptionCard accountId={account.id} subscription={subscription} />
                     </div>
                 </div>
+
+                <OpenInvoicesCard accountId={account.id} invoices={open_invoices} payerEmail={payerEmail} />
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     <ApiKeysCard apiKeys={api_keys} />
@@ -406,12 +480,31 @@ export default function AdminAccountShow({
                         <CardContent className="p-0">
                             <DataTable
                                 empty="Nenhum pagamento registrado."
-                                headers={['Tipo', 'Status', 'Valor', 'Data']}
+                                headers={['Tipo', 'Status', 'Valor', 'Data', '']}
                                 rows={recent_payments.map((p) => [
                                     paymentTypeLabel(p.type),
                                     <PaymentStatusBadge key="status" status={p.status} />,
                                     <span key="amount" className="font-medium tabular-nums">{formatBRL(p.amount_cents)}</span>,
                                     formatDate(p.paid_at ?? p.created_at),
+                                    p.pix ? (
+                                        <Button
+                                            key="pix"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setReopenedCharge({
+                                                    id: p.id,
+                                                    status: p.status,
+                                                    amount_cents: p.amount_cents,
+                                                    qr_code: p.pix?.qr_code ?? null,
+                                                    qr_code_base64: p.pix?.qr_code_base64 ?? null,
+                                                    expires_at: null,
+                                                })
+                                            }
+                                        >
+                                            <QrCode /> Ver PIX
+                                        </Button>
+                                    ) : null,
                                 ])}
                             />
                         </CardContent>
@@ -441,21 +534,64 @@ export default function AdminAccountShow({
                     </Card>
                 </div>
             </div>
+
+            <PixChargeDialog accountId={account.id} charge={pixCharge} onClose={closePixDialog} />
         </>
     );
 }
+
+type PlanBilling = 'pix' | 'courtesy';
 
 function AccountOpsCard({
     accountId,
     wallet,
     plans,
+    hasActiveSubscription,
+    payerEmail,
+    onPayerEmailChange,
+    payerEmailError,
 }: {
     accountId: string;
     wallet: WalletInfo;
     plans: PlanOption[];
+    hasActiveSubscription: boolean;
+    payerEmail: string;
+    onPayerEmailChange: (email: string) => void;
+    payerEmailError?: string;
 }) {
     const adjust = useForm<{ delta: string; reason: string }>({ delta: '', reason: '' });
-    const assign = useForm<{ plan_id: string }>({ plan_id: plans[0]?.id ?? '' });
+    const assign = useForm<{ plan_id: string; billing: PlanBilling }>({
+        plan_id: plans[0]?.id ?? '',
+        billing: 'pix',
+    });
+    const topup = useForm<{ amount: string }>({ amount: '' });
+
+    const selectedPlan = plans.find((plan) => plan.id === assign.data.plan_id);
+    const pixBlocked = assign.data.billing === 'pix' && hasActiveSubscription;
+
+    const submitAssign = (e: FormEvent) => {
+        e.preventDefault();
+
+        if (assign.data.billing === 'pix') {
+            // Assinatura + 1ª fatura + PIX: o saldo só entra após o pagamento.
+            assign.transform((d) => ({ plan_id: d.plan_id, payer_email: payerEmail || null }));
+            assign.post(`/admin/accounts/${accountId}/charges/plan`, { preserveScroll: true });
+
+            return;
+        }
+
+        assign.transform((d) => ({ plan_id: d.plan_id }));
+        assign.post(`/admin/accounts/${accountId}/assign-plan`, { preserveScroll: true });
+    };
+
+    const submitTopup = (e: FormEvent) => {
+        e.preventDefault();
+        topup.transform((d) => ({ amount: Number(d.amount), payer_email: payerEmail || null }));
+        topup.post(`/admin/accounts/${accountId}/charges/topup`, {
+            preserveScroll: true,
+            onSuccess: () => topup.reset(),
+        });
+    };
 
     return (
         <Card className="gap-0 py-0">
@@ -500,13 +636,7 @@ function AccountOpsCard({
 
                 <div className="space-y-3">
                     <h4 className="text-sm font-medium">Atribuir plano</h4>
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            assign.post(`/admin/accounts/${accountId}/assign-plan`, { preserveScroll: true });
-                        }}
-                        className="space-y-3"
-                    >
+                    <form onSubmit={submitAssign} className="space-y-3">
                         <Select value={assign.data.plan_id} onValueChange={(v) => assign.setData('plan_id', v)}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecione um plano" />
@@ -514,17 +644,90 @@ function AccountOpsCard({
                             <SelectContent>
                                 {plans.map((plan) => (
                                     <SelectItem key={plan.id} value={plan.id}>
-                                        {plan.name} · {formatBRL(plan.included_credits)}/ciclo
+                                        {plan.name} · {formatBRL(plan.price_cents)}/mês · saldo {formatBRL(plan.included_credits)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button type="submit" variant="secondary" size="sm" disabled={plans.length === 0 || assign.processing} className="w-full">
-                            Atribuir plano
+                        <Select value={assign.data.billing} onValueChange={(v) => assign.setData('billing', v as PlanBilling)}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="pix">Cobrar via PIX</SelectItem>
+                                <SelectItem value="courtesy">Cortesia (sem cobrança)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            {assign.data.billing === 'pix'
+                                ? `Cria a assinatura e gera o PIX${selectedPlan ? ` de ${formatBRL(selectedPlan.price_cents)}` : ''} para enviar ao cliente. O saldo entra após o pagamento e as renovações viram faturas mensais.`
+                                : 'Libera o saldo do plano agora, sem cobrar e sem renovação automática.'}
+                        </p>
+                        {assign.errors.plan_id && <p className="text-sm text-destructive">{assign.errors.plan_id}</p>}
+                        {pixBlocked && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                O cliente já tem assinatura ativa. Cancele-a no card “Assinatura” para atribuir outro plano com cobrança.
+                            </p>
+                        )}
+                        <Button
+                            type="submit"
+                            variant="secondary"
+                            size="sm"
+                            disabled={plans.length === 0 || assign.processing || pixBlocked}
+                            className="w-full"
+                        >
+                            {assign.data.billing === 'pix' ? (
+                                <>
+                                    <QrCode /> Atribuir e gerar PIX
+                                </>
+                            ) : (
+                                'Atribuir plano'
+                            )}
                         </Button>
                     </form>
                     {plans.length === 0 && (
                         <p className="text-xs text-muted-foreground">Nenhum plano ativo cadastrado.</p>
+                    )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Gerar PIX de recarga</h4>
+                    <form onSubmit={submitTopup} className="space-y-3">
+                        <Input
+                            type="number"
+                            min={1}
+                            step="0.01"
+                            placeholder="Valor em R$"
+                            value={topup.data.amount}
+                            onChange={(e) => topup.setData('amount', e.target.value)}
+                            required
+                        />
+                        {topup.errors.amount && <p className="text-sm text-destructive">{topup.errors.amount}</p>}
+                        <Button type="submit" variant="secondary" size="sm" disabled={topup.processing} className="w-full">
+                            <QrCode /> Gerar PIX
+                        </Button>
+                    </form>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                    <Label htmlFor="pix-payer-email">Email do pagador (PIX)</Label>
+                    <Input
+                        id="pix-payer-email"
+                        type="email"
+                        placeholder="financeiro@cliente.com.br"
+                        value={payerEmail}
+                        onChange={(e) => onPayerEmailChange(e.target.value)}
+                    />
+                    {payerEmailError ? (
+                        <p className="text-sm text-destructive">{payerEmailError}</p>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            Usado nas cobranças PIX desta tela. Em branco, vale o email do primeiro usuário da conta.
+                        </p>
                     )}
                 </div>
             </CardContent>
@@ -532,11 +735,35 @@ function AccountOpsCard({
     );
 }
 
-function SubscriptionCard({ subscription }: { subscription: Subscription | null }) {
+function SubscriptionCard({ accountId, subscription }: { accountId: string; subscription: Subscription | null }) {
+    const cancelable = subscription !== null && ['active', 'past_due'].includes(subscription.status);
+
+    const cancel = () => {
+        if (!subscription || !confirm('Cancelar a assinatura deste cliente? A recorrência será encerrada.')) {
+            return;
+        }
+
+        router.post(
+            `/admin/accounts/${accountId}/subscriptions/${subscription.id}/cancel`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
     return (
         <Card className="gap-0 py-0">
-            <CardHeader className="border-b border-border py-4">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border py-4">
                 <CardTitle className="text-base">Assinatura</CardTitle>
+                {cancelable && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                        onClick={cancel}
+                    >
+                        Cancelar
+                    </Button>
+                )}
             </CardHeader>
             <CardContent className="p-4">
                 {subscription ? (
@@ -569,6 +796,223 @@ function SubscriptionCard({ subscription }: { subscription: Subscription | null 
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+function OpenInvoicesCard({
+    accountId,
+    invoices,
+    payerEmail,
+}: {
+    accountId: string;
+    invoices: OpenInvoiceRow[];
+    payerEmail: string;
+}) {
+    const [generatingId, setGeneratingId] = useState<string | null>(null);
+
+    const generatePix = (invoiceId: string) => {
+        router.post(
+            `/admin/accounts/${accountId}/charges/invoices/${invoiceId}`,
+            { payer_email: payerEmail || null },
+            {
+                preserveScroll: true,
+                onStart: () => setGeneratingId(invoiceId),
+                onFinish: () => setGeneratingId(null),
+            },
+        );
+    };
+
+    return (
+        <Card className="gap-0 py-0">
+            <CardHeader className="border-b border-border py-4">
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <Receipt className="size-4" /> Faturas em aberto
+                </CardTitle>
+                <CardDescription>
+                    Gere um PIX para o cliente pagar — útil quando o PIX anterior expirou ou na renovação do plano.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                <DataTable
+                    empty="Nenhuma fatura em aberto."
+                    headers={['Fatura', 'Vencimento', 'Status', 'Valor', '']}
+                    rows={invoices.map((invoice) => [
+                        <div key="invoice">
+                            <p className="font-medium text-foreground">{invoice.description ?? 'Fatura'}</p>
+                            {invoice.number && <p className="font-mono text-xs">{invoice.number}</p>}
+                        </div>,
+                        invoice.due_date ? formatDate(`${invoice.due_date}T12:00:00`) : '—',
+                        <Badge
+                            key="status"
+                            variant="outline"
+                            className={invoice.status === 'overdue'
+                                ? 'border-transparent bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+                                : 'border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'}
+                        >
+                            {invoice.status === 'overdue' ? 'Vencida' : 'Em aberto'}
+                        </Badge>,
+                        <span key="amount" className="font-medium tabular-nums">{formatBRL(invoice.amount_cents)}</span>,
+                        <Button
+                            key="pix"
+                            variant="outline"
+                            size="sm"
+                            disabled={generatingId !== null}
+                            onClick={() => generatePix(invoice.id)}
+                        >
+                            <QrCode /> Gerar PIX
+                        </Button>,
+                    ])}
+                />
+            </CardContent>
+        </Card>
+    );
+}
+
+const FINAL_PAYMENT_STATUSES = ['approved', 'rejected', 'cancelled', 'refunded'];
+
+function PixChargeDialog({
+    accountId,
+    charge,
+    onClose,
+}: {
+    accountId: string;
+    charge: PixCharge | null;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog
+            open={charge !== null}
+            onOpenChange={(next) => {
+                if (!next) {
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent>
+                {charge && <PixChargeContent key={charge.id} accountId={accountId} charge={charge} />}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function PixChargeContent({ accountId, charge }: { accountId: string; charge: PixCharge }) {
+    const [status, setStatus] = useState(charge.status);
+    const [copied, setCopied] = useState(false);
+    const isFinal = FINAL_PAYMENT_STATUSES.includes(status);
+
+    // Reconsulta o pagamento no gateway ao abrir e enquanto o diálogo está
+    // aberto: PIX vencido vira "cancelled"; aprovado, o backend liquida
+    // (saldo/fatura) e a tela recarrega os dados financeiros.
+    useEffect(() => {
+        if (isFinal) {
+            return;
+        }
+
+        let active = true;
+
+        const check = async () => {
+            try {
+                const res = await fetch(`/admin/accounts/${accountId}/charges/${charge.id}/status`, {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!res.ok || !active) {
+                    return;
+                }
+
+                const data = (await res.json()) as { status: string };
+
+                if (!active) {
+                    return;
+                }
+
+                setStatus(data.status);
+
+                if (FINAL_PAYMENT_STATUSES.includes(data.status)) {
+                    router.reload({ only: BILLING_PROPS });
+                }
+            } catch {
+                /* ignora falha de polling */
+            }
+        };
+
+        void check();
+        const timer = setInterval(check, 6000);
+
+        return () => {
+            active = false;
+            clearInterval(timer);
+        };
+    }, [accountId, charge.id, isFinal]);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(charge.qr_code ?? '');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            /* clipboard indisponível */
+        }
+    };
+
+    return (
+        <>
+            <DialogHeader>
+                <DialogTitle>PIX de {formatBRL(charge.amount_cents)}</DialogTitle>
+                <DialogDescription>
+                    Envie o QR Code ou o código copia e cola ao cliente. O saldo entra automaticamente
+                    após a confirmação do pagamento.
+                </DialogDescription>
+            </DialogHeader>
+
+            {status === 'approved' ? (
+                <div className="flex items-center gap-2 rounded-md border border-brand-green/40 bg-brand-green/5 p-4 text-sm font-medium text-brand-green">
+                    <Check className="size-4" /> Pagamento confirmado! O saldo do cliente já foi atualizado.
+                </div>
+            ) : isFinal ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                    Este PIX expirou ou foi cancelado. Gere uma nova cobrança para o cliente.
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                        <Badge variant="outline" className="border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                            Aguardando pagamento
+                        </Badge>
+                        {charge.expires_at && (
+                            <span className="text-xs text-muted-foreground">
+                                Válido até {formatDateTime(charge.expires_at)}
+                            </span>
+                        )}
+                    </div>
+
+                    {charge.qr_code_base64 && (
+                        <img
+                            src={`data:image/png;base64,${charge.qr_code_base64}`}
+                            alt="QR Code PIX"
+                            className="mx-auto size-48 rounded-md border border-border bg-white p-2"
+                        />
+                    )}
+
+                    <div className="space-y-2">
+                        <Label>PIX copia e cola</Label>
+                        <div className="flex items-center gap-2">
+                            <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-xs whitespace-nowrap">
+                                {charge.qr_code}
+                            </code>
+                            <Button type="button" variant="outline" size="sm" onClick={copy} aria-label="Copiar código PIX">
+                                {copied ? <Check className="text-brand-green" /> : <Copy />}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                        Pode fechar esta janela: o pagamento é confirmado automaticamente e o PIX pendente
+                        fica disponível em “Pagamentos recentes” → Ver PIX.
+                    </p>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -912,13 +1356,19 @@ function PaymentStatusBadge({ status }: { status: string }) {
     const styles: Record<string, string> = {
         approved: 'border-transparent bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
         pending: 'border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+        in_process: 'border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
         rejected: 'border-transparent bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+        cancelled: 'border-transparent bg-muted text-muted-foreground',
+        refunded: 'border-transparent bg-muted text-muted-foreground',
     };
 
     const labels: Record<string, string> = {
         approved: 'Aprovado',
         pending: 'Pendente',
+        in_process: 'Aguardando',
         rejected: 'Rejeitado',
+        cancelled: 'Cancelado',
+        refunded: 'Estornado',
     };
 
     return (
@@ -955,6 +1405,7 @@ function creditTypeLabel(type: string): string {
 function subscriptionStatusLabel(status: string): string {
     const labels: Record<string, string> = {
         active: 'Ativa',
+        past_due: 'Em atraso',
         paused: 'Pausada',
         cancelled: 'Cancelada',
         pending: 'Pendente',

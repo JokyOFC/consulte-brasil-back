@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\VerifyEmailNotification;
+use App\Support\AppSettings;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,6 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Src\Modules\Identity\Domain\ValueObject\Role;
 
 #[Fillable(['name', 'email', 'phone', 'password', 'last_login_at', 'last_login_ip', 'last_login_user_agent'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -38,6 +40,28 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public function sendEmailVerificationNotification(): void
     {
+        if (! $this->emailVerificationRequired()) {
+            return;
+        }
+
         $this->notify(new VerifyEmailNotification);
+    }
+
+    /**
+     * Confirmação de email exigida para este usuário? Admins sempre; clientes
+     * seguem a configuração geral (Admin > Configurações).
+     */
+    public function emailVerificationRequired(): bool
+    {
+        return $this->role === Role::Admin->value || AppSettings::clientEmailVerificationEnabled();
+    }
+
+    /**
+     * 2FA em vigor para este usuário (desafio no login + gestão)? Admins
+     * sempre; clientes seguem a configuração geral (Admin > Configurações).
+     */
+    public function twoFactorAvailable(): bool
+    {
+        return $this->role === Role::Admin->value || AppSettings::clientTwoFactorEnabled();
     }
 }

@@ -3,7 +3,7 @@
 @section('content')
     <p style="margin:0 0 16px;">Olá, <strong>{{ $userName }}</strong>!</p>
 
-    <p style="margin:0 0 20px;">{{ $message }}</p>
+    <p style="margin:0 0 20px;">{{ $intro }}</p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
         <tr>
