@@ -39,6 +39,9 @@ final class FakePaymentGateway implements PaymentGateway
 
     public bool $automaticCardRecurringEnabled = true;
 
+    /** Simula o MP recusando a criação de cobranças (pix/boleto/cartão). */
+    public bool $failCharges = false;
+
     private int $seq = 0;
 
     public function createPixPayment(GatewayChargeInput $input): GatewayCharge
@@ -131,6 +134,10 @@ final class FakePaymentGateway implements PaymentGateway
 
     private function charge(string $method, GatewayChargeInput $input): GatewayCharge
     {
+        if ($this->failCharges) {
+            throw PaymentGatewayError::from('charge rejected');
+        }
+
         $id = 'mp_'.(++$this->seq);
         $this->charges[] = ['method' => $method, 'input' => $input, 'id' => $id];
 

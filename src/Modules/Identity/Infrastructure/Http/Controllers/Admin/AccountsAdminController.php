@@ -18,7 +18,9 @@ use Src\Modules\Billing\Application\UseCase\AdjustCredits;
 use Src\Modules\Billing\Application\UseCase\AssignPlanToAccount;
 use Src\Modules\Billing\Domain\Repository\PlanRepository;
 use Src\Modules\Billing\Domain\Repository\WalletRepository;
+use Src\Modules\Billing\Domain\ValueObject\InvoiceStatus;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\CreditTransactionModel;
+use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\InvoiceModel;
 use Src\Modules\Billing\Infrastructure\Persistence\Eloquent\Models\PaymentModel;
 use Src\Modules\Consultation\Infrastructure\Persistence\Eloquent\Models\ConsultationModel;
 use Src\Modules\Identity\Application\DTO\CreateAccountInput;
@@ -76,9 +78,11 @@ final class AccountsAdminController
         $successConsultations = (clone $consultBase)->where('status', 'success')->count();
         $consumptionTotal = (int) (clone $consultBase)->where('status', 'success')->sum('credit_cost');
 
+        // Assinatura vigente (ativa/em atraso) primeiro; senão, a mais recente.
         $subscription = DB::table('subscriptions')
             ->leftJoin('plans', 'subscriptions.plan_id', '=', 'plans.id')
             ->where('subscriptions.account_id', $accountId)
+            ->orderByRaw("CASE WHEN subscriptions.status IN ('active', 'past_due') THEN 0 ELSE 1 END")
             ->orderByDesc('subscriptions.created_at')
             ->first([
                 'subscriptions.id',
@@ -200,8 +204,30 @@ final class AccountsAdminController
                     'amount_cents' => (int) $payment->amount_cents,
                     'created_at' => Dates::toFrontendIso($payment->created_at),
                     'paid_at' => Dates::toFrontendIso($payment->paid_at),
+                    // PIX pendente: o admin pode reabrir o QR para reenviar ao cliente.
+                    'pix' => $this->reopenablePix($payment),
                 ])
                 ->all(),
+            'open_invoices' => InvoiceModel::query()
+                ->where('account_id', $accountId)
+                ->whereIn('status', [InvoiceStatus::Open->value, InvoiceStatus::Overdue->value])
+                ->orderBy('due_date')
+                ->get()
+                ->map(fn (InvoiceModel $invoice) => [
+                    'id' => $invoice->id,
+                    'number' => $invoice->number,
+                    'status' => $invoice->status,
+                    'amount_cents' => (int) $invoice->amount_cents,
+                    'description' => $invoice->description,
+                    'due_date' => $invoice->due_date?->toDateString(),
+                ])
+                ->all(),
+            // Pagador padrão das cobranças PIX geradas pelo admin.
+            'payer_email' => User::query()
+                ->where('account_id', $accountId)
+                ->where('role', Role::Client->value)
+                ->orderBy('id')
+                ->value('email'),
             'credit_transactions' => CreditTransactionModel::query()
                 ->where('account_id', $accountId)
                 ->orderByDesc('created_at')
@@ -219,9 +245,32 @@ final class AccountsAdminController
             'plans' => array_map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->name,
+                'price_cents' => $p->price->cents,
                 'included_credits' => $p->includedCredits,
             ], $plans->active()),
         ]);
+    }
+
+    /**
+     * Dados do QR de um PIX ainda pendente. A validade não é checada aqui:
+     * payments.expires_at guarda o horário no fuso devolvido pelo gateway, então
+     * quem decide se expirou é o próprio gateway — o diálogo reconsulta o status
+     * ao abrir e o PIX vencido passa a "cancelled".
+     *
+     * @return array{qr_code: string, qr_code_base64: string|null}|null
+     */
+    private function reopenablePix(PaymentModel $payment): ?array
+    {
+        $pending = in_array($payment->status, ['pending', 'in_process'], true);
+
+        if ($payment->method !== 'pix' || ! $pending || $payment->qr_code === null) {
+            return null;
+        }
+
+        return [
+            'qr_code' => $payment->qr_code,
+            'qr_code_base64' => $payment->qr_code_base64,
+        ];
     }
 
     /**

@@ -63,6 +63,31 @@ final class PaymentConfirmedEmailTest extends TestCase
         });
     }
 
+    public function test_payment_confirmed_email_is_actually_delivered(): void
+    {
+        // Sem Mail::fake(): o email é renderizado e enviado de verdade (mailer
+        // "array"), o que pega variáveis de view reservadas pelo Mailer.
+        $accountId = app(CreateAccount::class)->handle(new CreateAccountInput('ACME', '11.222.333/0001-81'))->id->value;
+        $this->seedUserForAccount($accountId);
+
+        app(CreateWalletTopup::class)->handle(new CreateWalletTopupInput(
+            accountId: $accountId,
+            amountCents: 5000,
+            method: PaymentMethod::Pix,
+            payerEmail: 'billing@acme.test',
+        ));
+
+        $mpId = $this->gateway->approveCharge(0);
+        app(HandleMercadoPagoWebhook::class)->handle('payment', $mpId);
+
+        $sent = app('mailer')->getSymfonyTransport()->messages();
+        $this->assertCount(1, $sent);
+
+        $html = (string) $sent->first()->getOriginalMessage()->getHtmlBody();
+        $this->assertStringContainsString('Sua recarga foi processada com sucesso', $html);
+        $this->assertStringContainsString('R$ 50,00', $html);
+    }
+
     public function test_duplicate_webhook_does_not_send_second_payment_email(): void
     {
         Mail::fake();

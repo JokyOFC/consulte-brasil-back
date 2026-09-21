@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminDashboardController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 use Src\Modules\Audit\Infrastructure\Http\Controllers\Admin\RequestLogsAdminController;
+use Src\Modules\Billing\Infrastructure\Http\Controllers\Admin\AccountChargesAdminController;
 use Src\Modules\Billing\Infrastructure\Http\Controllers\Admin\FinanceAdminController;
 use Src\Modules\Billing\Infrastructure\Http\Controllers\Admin\PlansAdminController;
 use Src\Modules\Consultation\Infrastructure\Http\Controllers\Admin\QueryTypesAdminController;
@@ -39,6 +40,20 @@ Route::middleware(['auth', 'verified', 'role:admin', 'throttle:60,1'])
         Route::post('/accounts/{accountId}/assign-plan', [AccountsAdminController::class, 'assignPlan'])
             ->middleware(RequirePassword::class)
             ->name('accounts.assign-plan');
+
+        // Cobranças PIX geradas pelo admin em nome do cliente (plano, recarga, fatura)
+        Route::post('/accounts/{accountId}/charges/plan', [AccountChargesAdminController::class, 'plan'])
+            ->middleware(RequirePassword::class)
+            ->name('accounts.charges.plan');
+        Route::post('/accounts/{accountId}/charges/topup', [AccountChargesAdminController::class, 'topup'])
+            ->name('accounts.charges.topup');
+        Route::post('/accounts/{accountId}/charges/invoices/{invoiceId}', [AccountChargesAdminController::class, 'invoice'])
+            ->name('accounts.charges.invoice');
+        Route::get('/accounts/{accountId}/charges/{paymentId}/status', [AccountChargesAdminController::class, 'status'])
+            ->name('accounts.charges.status');
+        Route::post('/accounts/{accountId}/subscriptions/{subscriptionId}/cancel', [AccountChargesAdminController::class, 'cancelSubscription'])
+            ->middleware(RequirePassword::class)
+            ->name('accounts.subscriptions.cancel');
 
         // Financeiro
         Route::get('/finance', [FinanceAdminController::class, 'index'])->name('finance.index');

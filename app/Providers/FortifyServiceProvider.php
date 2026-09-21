@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\RedirectIfTwoFactorRequired;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -11,6 +13,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\RedirectsIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -21,7 +24,11 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Desafio de 2FA no login condicionado à configuração do admin.
+        $this->app->scoped(
+            RedirectsIfTwoFactorAuthenticatable::class,
+            fn ($app) => $app->make(RedirectIfTwoFactorRequired::class),
+        );
     }
 
     /**
@@ -63,9 +70,18 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
-        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
-            'status' => $request->session()->get('status'),
-        ]));
+        Fortify::verifyEmailView(function (Request $request) {
+            $user = $request->user();
+
+            // Confirmação de email desligada para clientes: nada a verificar.
+            if ($user instanceof User && ! $user->emailVerificationRequired()) {
+                return redirect()->intended(config('fortify.home'));
+            }
+
+            return Inertia::render('auth/verify-email', [
+                'status' => $request->session()->get('status'),
+            ]);
+        });
 
         Fortify::registerView(fn () => Inertia::render('auth/register', [
             'passwordRules' => Password::defaults()->toPasswordRulesString(),

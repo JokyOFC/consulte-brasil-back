@@ -8,9 +8,11 @@
         integrar consultas de CPF, CNPJ e mais ao seu sistema com saldo prepago transparente.
     </p>
 
-    <p style="margin:0 0 16px;">
-        Antes de começar, confirme seu endereço de e-mail clicando no link que enviamos em seguida.
-    </p>
+    @if ($mustVerifyEmail)
+        <p style="margin:0 0 16px;">
+            Antes de começar, confirme seu endereço de e-mail clicando no link que enviamos em seguida.
+        </p>
+    @endif
 
     @include('mail.partials.button', [
         'url' => $dashboardUrl,

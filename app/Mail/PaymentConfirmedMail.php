@@ -38,13 +38,15 @@ final class PaymentConfirmedMail extends BrandedMailable
 
     protected function mailData(): array
     {
-        $message = $this->paymentType === PaymentType::Invoice
+        $intro = $this->paymentType === PaymentType::Invoice
             ? 'Recebemos o pagamento da sua fatura. O saldo do plano foi adicionado à sua carteira.'
             : 'Sua recarga foi processada com sucesso. O saldo já está disponível para consultas.';
 
         return [
             'userName' => $this->user->name,
-            'message' => $message,
+            // Não usar a chave 'message': o Mailer a reserva para o objeto
+            // Illuminate\Mail\Message e a view quebraria ao renderizar.
+            'intro' => $intro,
             'amountFormatted' => $this->formatMoney($this->amountCents),
             'creditsFormatted' => $this->formatMoney($this->creditsGranted),
             'billingUrl' => url('/client/billing'),
