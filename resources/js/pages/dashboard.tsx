@@ -53,13 +53,14 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
     return (
         <>
             <Head title="Painel" />
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold tracking-tight">Olá 👋</h1>
                         <p className="text-sm text-muted-foreground">Resumo da sua conta e consumo.</p>
                     </div>
-                    <div className="flex gap-2">
+                    {/* No celular a ação principal ocupa a linha toda e as outras dividem a de baixo. */}
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&>a:first-child]:col-span-2">
                         <Button asChild>
                             <Link href="/client/consultations">
                                 <FileSearch /> Nova consulta
@@ -124,46 +125,46 @@ export default function Dashboard({ wallet, stats, consumption, recent }: Props)
                             </Link>
                         </Button>
                     </CardHeader>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="text-left text-muted-foreground">
-                                <tr className="border-b border-border">
-                                    <th className="px-6 py-3 font-medium">Tipo</th>
-                                    <th className="px-6 py-3 font-medium">Provedor</th>
-                                    <th className="px-6 py-3 font-medium">Status</th>
-                                    <th className="px-6 py-3 text-right font-medium">Custo</th>
-                                    <th className="px-6 py-3 font-medium">Data</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recent.map((c) => (
-                                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                        <td className="px-6 py-3">
-                                            <Badge variant="secondary" className="uppercase">{c.query_type}</Badge>
-                                        </td>
-                                        <td className="px-6 py-3 text-muted-foreground">{c.provider ?? '—'}</td>
-                                        <td className="px-6 py-3"><ConsultationStatusBadge status={c.status} /></td>
-                                        <td className="px-6 py-3 text-right font-medium">{formatBRL(c.credit_cost)}</td>
-                                        <td className="px-6 py-3 text-muted-foreground">{formatDateTime(c.created_at)}</td>
+                    {/* overflow-x-auto: no celular a tabela rola dentro do card em vez de ser cortada. */}
+                    <CardContent className="overflow-x-auto p-0">
+                        {recent.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <FileText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+                                <p className="text-sm text-muted-foreground">
+                                    Você ainda não fez consultas.{' '}
+                                    <Link href="/client/consultations" className="text-brand-green hover:underline">
+                                        Realize sua primeira consulta
+                                    </Link>{' '}
+                                    ou integre via{' '}
+                                    <a href="/docs/api" className="text-brand-green hover:underline">API</a>.
+                                </p>
+                            </div>
+                        ) : (
+                            <table className="w-full min-w-[560px] text-sm whitespace-nowrap">
+                                <thead className="text-left text-muted-foreground">
+                                    <tr className="border-b border-border">
+                                        <th className="px-4 py-3 font-medium sm:px-6">Tipo</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Provedor</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Status</th>
+                                        <th className="px-4 py-3 text-right font-medium sm:px-6">Custo</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Data</th>
                                     </tr>
-                                ))}
-                                {recent.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <FileText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground">
-                                                Você ainda não fez consultas.{' '}
-                                                <Link href="/client/consultations" className="text-brand-green hover:underline">
-                                                    Realize sua primeira consulta
-                                                </Link>{' '}
-                                                ou integre via{' '}
-                                                <a href="/docs/api" className="text-brand-green hover:underline">API</a>.
-                                            </p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {recent.map((c) => (
+                                        <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                                            <td className="px-4 py-3 sm:px-6">
+                                                <Badge variant="secondary" className="uppercase">{c.query_type}</Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground sm:px-6">{c.provider ?? '—'}</td>
+                                            <td className="px-4 py-3 sm:px-6"><ConsultationStatusBadge status={c.status} /></td>
+                                            <td className="px-4 py-3 text-right font-medium sm:px-6">{formatBRL(c.credit_cost)}</td>
+                                            <td className="px-4 py-3 text-muted-foreground sm:px-6">{formatDateTime(c.created_at)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </CardContent>
                 </Card>
             </div>

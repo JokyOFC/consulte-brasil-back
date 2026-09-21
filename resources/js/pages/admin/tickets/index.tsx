@@ -98,8 +98,8 @@ export default function AdminTicketsIndex() {
                 </div>
 
                 <Card className="gap-0 py-0">
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
+                    <CardContent className="overflow-x-auto p-0">
+                        <table className="w-full min-w-[720px] text-sm">
                             <thead className="text-left text-muted-foreground">
                                 <tr className="border-b border-border">
                                     <th className="px-6 py-3 font-medium">Cliente</th>

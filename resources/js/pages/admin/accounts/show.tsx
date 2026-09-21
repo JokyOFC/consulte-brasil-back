@@ -473,7 +473,7 @@ export default function AdminAccountShow({
                 </Card>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <Card className="gap-0 py-0">
+                    <Card className="min-w-0 gap-0 py-0">
                         <CardHeader className="border-b border-border py-4">
                             <CardTitle className="text-base">Pagamentos recentes</CardTitle>
                         </CardHeader>
@@ -510,7 +510,7 @@ export default function AdminAccountShow({
                         </CardContent>
                     </Card>
 
-                    <Card className="gap-0 py-0">
+                    <Card className="min-w-0 gap-0 py-0">
                         <CardHeader className="border-b border-border py-4">
                             <CardTitle className="text-base">Movimentações da carteira</CardTitle>
                         </CardHeader>
@@ -1018,7 +1018,7 @@ function PixChargeContent({ accountId, charge }: { accountId: string; charge: Pi
 
 function ApiKeysCard({ apiKeys }: { apiKeys: ApiKeyRow[] }) {
     return (
-        <Card className="gap-0 py-0">
+        <Card className="min-w-0 gap-0 py-0">
             <CardHeader className="border-b border-border py-4">
                 <CardTitle className="flex items-center gap-2 text-base">
                     <KeyRound className="size-4" /> Chaves de API
@@ -1125,8 +1125,8 @@ function EditAccountDialog({ account }: { account: Account }) {
 
 function UsersCard({ accountId, users }: { accountId: string; users: UserRow[] }) {
     return (
-        <Card className="gap-0 py-0">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-border py-4">
+        <Card className="min-w-0 gap-0 py-0">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b border-border py-4">
                 <CardTitle className="flex items-center gap-2 text-base">
                     <Users className="size-4" /> Usuários vinculados
                 </CardTitle>
@@ -1330,25 +1330,28 @@ function DataTable({
         return <p className="px-6 py-12 text-center text-sm text-muted-foreground">{empty}</p>;
     }
 
+    // overflow-x-auto: em telas estreitas a tabela rola dentro do card em vez de ser cortada.
     return (
-        <table className="w-full text-sm">
-            <thead className="text-left text-muted-foreground">
-                <tr className="border-b border-border">
-                    {headers.map((header) => (
-                        <th key={header} className="px-6 py-3 font-medium">{header}</th>
-                    ))}
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((cells, index) => (
-                    <tr key={index} className="border-b border-border last:border-0 hover:bg-muted/40">
-                        {cells.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="px-6 py-3 text-muted-foreground">{cell}</td>
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm whitespace-nowrap">
+                <thead className="text-left text-muted-foreground">
+                    <tr className="border-b border-border">
+                        {headers.map((header) => (
+                            <th key={header} className="px-4 py-3 font-medium sm:px-6">{header}</th>
                         ))}
                     </tr>
-                ))}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {rows.map((cells, index) => (
+                        <tr key={index} className="border-b border-border last:border-0 hover:bg-muted/40">
+                            {cells.map((cell, cellIndex) => (
+                                <td key={cellIndex} className="px-4 py-3 text-muted-foreground sm:px-6">{cell}</td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     );
 }
 

@@ -300,8 +300,8 @@ export default function AdminDashboard({ stats, charts, recent }: Props) {
                     <CardHeader className="border-b border-border py-4">
                         <CardTitle className="text-base">Consultas recentes — todos os clientes</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
+                    <CardContent className="overflow-x-auto p-0">
+                        <table className="w-full min-w-[640px] text-sm">
                             <thead className="text-left text-muted-foreground">
                                 <tr className="border-b border-border">
                                     <th className="px-6 py-3 font-medium">Cliente</th>

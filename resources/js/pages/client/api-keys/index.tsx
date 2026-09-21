@@ -69,67 +69,67 @@ export default function ClientApiKeysIndex() {
                 {flash?.plain_token && <TokenReveal token={flash.plain_token} />}
 
                 <Card className="gap-0 py-0">
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="text-left text-muted-foreground">
-                                <tr className="border-b border-border">
-                                    <th className="px-6 py-3 font-medium">Nome</th>
-                                    <th className="px-6 py-3 font-medium">Chave</th>
-                                    <th className="px-6 py-3 font-medium">Status</th>
-                                    <th className="px-6 py-3 font-medium">Último uso</th>
-                                    <th className="px-6 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {keys.map((k) => (
-                                    <tr key={k.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                        <td className="px-6 py-3 font-medium">{k.name}</td>
-                                        <td className="px-6 py-3 font-mono text-xs text-muted-foreground">
-                                            {k.prefix}…{k.last_four}
-                                        </td>
-                                        <td className="px-6 py-3">
-                                            <Badge
-                                                variant="outline"
-                                                className={k.status === 'active'
-                                                    ? 'border-transparent bg-green-100 text-green-700'
-                                                    : 'border-transparent bg-muted text-muted-foreground'}
-                                            >
-                                                {k.status === 'active' ? 'Ativa' : 'Revogada'}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-6 py-3 text-muted-foreground">
-                                            {k.last_used_at ? formatDate(k.last_used_at) : 'nunca'}
-                                        </td>
-                                        <td className="px-6 py-3 text-right">
-                                            {k.status === 'active' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-destructive hover:text-destructive"
-                                                    onClick={() => {
-                                                        if (confirm(`Revogar a chave "${k.name}"? Esta ação não pode ser desfeita.`)) {
-                                                            router.delete(`/client/api-keys/${k.id}`, { preserveScroll: true });
-                                                        }
-                                                    }}
+                    {/* overflow-x-auto: no celular a tabela rola dentro do card em vez de ser cortada. */}
+                    <CardContent className="overflow-x-auto p-0">
+                        {keys.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <KeyRound className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+                                <p className="text-sm text-muted-foreground">
+                                    Nenhuma chave emitida. Crie a primeira para usar a API.
+                                </p>
+                            </div>
+                        ) : (
+                            <table className="w-full min-w-[600px] text-sm whitespace-nowrap">
+                                <thead className="text-left text-muted-foreground">
+                                    <tr className="border-b border-border">
+                                        <th className="px-4 py-3 font-medium sm:px-6">Nome</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Chave</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Status</th>
+                                        <th className="px-4 py-3 font-medium sm:px-6">Último uso</th>
+                                        <th className="px-4 py-3 sm:px-6"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {keys.map((k) => (
+                                        <tr key={k.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-medium sm:px-6">{k.name}</td>
+                                            <td className="px-4 py-3 font-mono text-xs text-muted-foreground sm:px-6">
+                                                {k.prefix}…{k.last_four}
+                                            </td>
+                                            <td className="px-4 py-3 sm:px-6">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={k.status === 'active'
+                                                        ? 'border-transparent bg-green-100 text-green-700'
+                                                        : 'border-transparent bg-muted text-muted-foreground'}
                                                 >
-                                                    <Trash2 /> Revogar
-                                                </Button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {keys.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <KeyRound className="mx-auto mb-3 size-8 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground">
-                                                Nenhuma chave emitida. Crie a primeira para usar a API.
-                                            </p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                                    {k.status === 'active' ? 'Ativa' : 'Revogada'}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground sm:px-6">
+                                                {k.last_used_at ? formatDate(k.last_used_at) : 'nunca'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right sm:px-6">
+                                                {k.status === 'active' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => {
+                                                            if (confirm(`Revogar a chave "${k.name}"? Esta ação não pode ser desfeita.`)) {
+                                                                router.delete(`/client/api-keys/${k.id}`, { preserveScroll: true });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 /> Revogar
+                                                    </Button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </CardContent>
                 </Card>
             </div>
