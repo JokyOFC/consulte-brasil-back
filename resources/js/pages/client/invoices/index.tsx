@@ -162,46 +162,44 @@ export default function ClientInvoicesIndex() {
                         <h2 className="text-sm font-semibold">Planos contratados</h2>
                     </div>
                     <Card className="gap-0 py-0">
-                        <CardContent className="p-0">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-muted-foreground">
-                                    <tr className="border-b border-border">
-                                        <th className="px-6 py-3 font-medium">Plano</th>
-                                        <th className="px-6 py-3 font-medium">Créditos</th>
-                                        <th className="px-6 py-3 font-medium">Valor</th>
-                                        <th className="px-6 py-3 font-medium">Validade</th>
-                                        <th className="px-6 py-3 font-medium">Método</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {subscriptions.map((s) => (
-                                        <tr key={s.id} className="border-b border-border last:border-0">
-                                            <td className="px-6 py-3 font-medium">{s.plan_name ?? '—'}</td>
-                                            <td className="px-6 py-3">{formatBRL(s.recharge_cents)}</td>
-                                            <td className="px-6 py-3">{formatBRL(s.price_cents)}</td>
-                                            <td className="px-6 py-3 text-muted-foreground">
-                                                {s.current_period_end ?? s.next_billing_at ?? '—'}
-                                            </td>
-                                            <td className="px-6 py-3 capitalize text-muted-foreground">
-                                                {s.payment_method === 'manual' ? 'PIX/Boleto' : s.payment_method ?? '—'}
-                                            </td>
+                        {/* overflow-x-auto: no celular a tabela rola dentro do card em vez de ser cortada. */}
+                        <CardContent className="overflow-x-auto p-0">
+                            {subscriptions.length === 0 ? (
+                                <p className="px-6 py-10 text-center text-sm text-muted-foreground">Nenhum plano ativo.</p>
+                            ) : (
+                                <table className="w-full min-w-[540px] text-sm whitespace-nowrap">
+                                    <thead className="text-left text-muted-foreground">
+                                        <tr className="border-b border-border">
+                                            <th className="px-4 py-3 font-medium sm:px-6">Plano</th>
+                                            <th className="px-4 py-3 font-medium sm:px-6">Créditos</th>
+                                            <th className="px-4 py-3 font-medium sm:px-6">Valor</th>
+                                            <th className="px-4 py-3 font-medium sm:px-6">Validade</th>
+                                            <th className="px-4 py-3 font-medium sm:px-6">Método</th>
                                         </tr>
-                                    ))}
-                                    {subscriptions.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">
-                                                Nenhum plano ativo.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {subscriptions.map((s) => (
+                                            <tr key={s.id} className="border-b border-border last:border-0">
+                                                <td className="px-4 py-3 font-medium sm:px-6">{s.plan_name ?? '—'}</td>
+                                                <td className="px-4 py-3 sm:px-6">{formatBRL(s.recharge_cents)}</td>
+                                                <td className="px-4 py-3 sm:px-6">{formatBRL(s.price_cents)}</td>
+                                                <td className="px-4 py-3 text-muted-foreground sm:px-6">
+                                                    {s.current_period_end ?? s.next_billing_at ?? '—'}
+                                                </td>
+                                                <td className="px-4 py-3 capitalize text-muted-foreground sm:px-6">
+                                                    {s.payment_method === 'manual' ? 'PIX/Boleto' : s.payment_method ?? '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </CardContent>
                     </Card>
                 </section>
 
                 <section className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
                             <Receipt className="size-4 text-muted-foreground" />
                             <h2 className="text-sm font-semibold">Histórico de faturas</h2>
@@ -221,56 +219,60 @@ export default function ClientInvoicesIndex() {
                     </div>
                     <Card className="gap-0 py-0">
                         <CardContent className="p-0">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-muted-foreground">
-                                    <tr className="border-b border-border">
-                                        <th className="px-6 py-3 font-medium">Número</th>
-                                        <th className="px-6 py-3 font-medium">Descrição</th>
-                                        <th className="px-6 py-3 font-medium">Vencimento</th>
-                                        <th className="px-6 py-3 font-medium">Valor</th>
-                                        <th className="px-6 py-3 font-medium">Status</th>
-                                        <th className="px-6 py-3"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.data.map((inv) => (
-                                        <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                            <td className="px-6 py-3 font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    <FileText className="size-3.5 text-muted-foreground" />
-                                                    {inv.number ?? '—'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                {inv.description ?? 'Fatura'}
-                                                {inv.is_renewal && (
-                                                    <Badge variant="outline" className="ml-2 border-brand-green/30 text-brand-green">
-                                                        Renovação
-                                                    </Badge>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-3 text-muted-foreground">{inv.due_date ?? '—'}</td>
-                                            <td className="px-6 py-3 font-medium">{formatBRL(inv.amount_cents)}</td>
-                                            <td className="px-6 py-3">
-                                                <StatusBadge status={inv.status} />
-                                            </td>
-                                            <td className="px-6 py-3 text-right">
-                                                <Button size="sm" variant="ghost" asChild>
-                                                    <Link href={`/client/invoices/${inv.id}`}>Detalhes</Link>
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {history.data.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
-                                                Nenhuma fatura encontrada.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                            <div className="px-6 py-3">
+                            {history.data.length === 0 ? (
+                                <p className="px-6 py-10 text-center text-sm text-muted-foreground">Nenhuma fatura encontrada.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[720px] text-sm whitespace-nowrap">
+                                        <thead className="text-left text-muted-foreground">
+                                            <tr className="border-b border-border">
+                                                <th className="px-4 py-3 font-medium sm:px-6">Número</th>
+                                                <th className="px-4 py-3 font-medium sm:px-6">Descrição</th>
+                                                <th className="px-4 py-3 font-medium sm:px-6">Vencimento</th>
+                                                <th className="px-4 py-3 font-medium sm:px-6">Valor</th>
+                                                <th className="px-4 py-3 font-medium sm:px-6">Status</th>
+                                                <th className="px-4 py-3 sm:px-6"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {history.data.map((inv) => (
+                                                <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                                                    <td className="px-4 py-3 font-medium sm:px-6">
+                                                        {/* O número leva ao detalhe: no celular a coluna
+                                                            "Detalhes" fica fora da área visível. */}
+                                                        <Link
+                                                            href={`/client/invoices/${inv.id}`}
+                                                            className="flex items-center gap-2 hover:text-brand-green hover:underline"
+                                                        >
+                                                            <FileText className="size-3.5 text-muted-foreground" />
+                                                            {inv.number ?? '—'}
+                                                        </Link>
+                                                    </td>
+                                                    <td className="px-4 py-3 sm:px-6">
+                                                        {inv.description ?? 'Fatura'}
+                                                        {inv.is_renewal && (
+                                                            <Badge variant="outline" className="ml-2 border-brand-green/30 text-brand-green">
+                                                                Renovação
+                                                            </Badge>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-muted-foreground sm:px-6">{inv.due_date ?? '—'}</td>
+                                                    <td className="px-4 py-3 font-medium sm:px-6">{formatBRL(inv.amount_cents)}</td>
+                                                    <td className="px-4 py-3 sm:px-6">
+                                                        <StatusBadge status={inv.status} />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right sm:px-6">
+                                                        <Button size="sm" variant="ghost" asChild>
+                                                            <Link href={`/client/invoices/${inv.id}`}>Detalhes</Link>
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            <div className="px-4 py-3 sm:px-6">
                                 <Pagination paginator={history} />
                             </div>
                         </CardContent>

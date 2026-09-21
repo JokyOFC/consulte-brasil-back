@@ -64,9 +64,9 @@ export default function ClientLogsIndex() {
                             e.preventDefault();
                             applyFilters({ q });
                         }}
-                        className="flex items-center gap-2"
+                        className="flex w-full items-center gap-2 sm:w-auto"
                     >
-                        <div className="relative">
+                        <div className="relative min-w-0 flex-1 sm:flex-none">
                             <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                             <Input
                                 value={q}
@@ -80,46 +80,52 @@ export default function ClientLogsIndex() {
                 </div>
 
                 <Card className="gap-0 py-0">
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="text-left text-muted-foreground">
-                                <tr className="border-b border-border">
-                                    <th className="px-4 py-3 font-medium">Data (Brasília)</th>
-                                    <th className="px-4 py-3 font-medium">Requisição</th>
-                                    <th className="px-4 py-3 font-medium">Status</th>
-                                    <th className="px-4 py-3 text-right font-medium">Latência</th>
-                                    <th className="px-4 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {logs.data.map((log) => (
-                                    <tr key={log.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDateTime(log.created_at)}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="font-mono">{log.method}</Badge>
-                                                <code className="text-xs">{log.path}</code>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3"><LogStatusBadge log={log} /></td>
-                                        <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                                            {log.duration_ms != null ? `${log.duration_ms}ms` : '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelected(log)}>Detalhes</Button>
-                                        </td>
+                    {/* overflow-x-auto: no celular a tabela rola dentro do card em vez de ser cortada. */}
+                    <CardContent className="overflow-x-auto p-0">
+                        {logs.data.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <ScrollText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+                                <p className="text-sm text-muted-foreground">Nenhuma requisição registrada ainda.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full min-w-[680px] text-sm whitespace-nowrap">
+                                <thead className="text-left text-muted-foreground">
+                                    <tr className="border-b border-border">
+                                        <th className="px-4 py-3 font-medium">Data (Brasília)</th>
+                                        <th className="px-4 py-3 font-medium">Requisição</th>
+                                        <th className="px-4 py-3 font-medium">Status</th>
+                                        <th className="px-4 py-3 text-right font-medium">Latência</th>
+                                        <th className="px-4 py-3"></th>
                                     </tr>
-                                ))}
-                                {logs.data.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <ScrollText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground">Nenhuma requisição registrada ainda.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {logs.data.map((log) => (
+                                        <tr
+                                            key={log.id}
+                                            // A linha inteira abre o detalhe: no celular o botão
+                                            // "Detalhes" fica fora da área visível da tabela.
+                                            className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/40"
+                                            onClick={() => setSelected(log)}
+                                        >
+                                            <td className="px-4 py-3 text-muted-foreground">{formatDateTime(log.created_at)}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="outline" className="font-mono">{log.method}</Badge>
+                                                    <code className="text-xs">{log.path}</code>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3"><LogStatusBadge log={log} /></td>
+                                            <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                                                {log.duration_ms != null ? `${log.duration_ms}ms` : '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Button variant="ghost" size="sm" onClick={() => setSelected(log)}>Detalhes</Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </CardContent>
                 </Card>
 

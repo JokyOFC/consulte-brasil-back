@@ -102,27 +102,27 @@ export default function ClientInvoiceShow() {
                 </div>
 
                 <Card className="gap-0 py-0">
-                    <CardContent className="p-0">
-                        <div className="border-b border-border px-6 py-3 text-sm font-semibold">Itens</div>
+                    <CardContent className="overflow-x-auto p-0">
+                        <div className="border-b border-border px-4 py-3 text-sm font-semibold sm:px-6">Itens</div>
                         <table className="w-full text-sm">
                             <thead className="text-left text-muted-foreground">
                                 <tr className="border-b border-border">
-                                    <th className="px-6 py-3 font-medium">Descrição</th>
-                                    <th className="px-6 py-3 font-medium">Qtd</th>
-                                    <th className="px-6 py-3 font-medium">Valor</th>
+                                    <th className="px-4 py-3 font-medium sm:px-6">Descrição</th>
+                                    <th className="px-4 py-3 font-medium sm:px-6">Qtd</th>
+                                    <th className="px-4 py-3 font-medium sm:px-6">Valor</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {invoice.items.map((item) => (
                                     <tr key={item.id} className="border-b border-border last:border-0">
-                                        <td className="px-6 py-3">{item.description}</td>
-                                        <td className="px-6 py-3">{item.quantity}</td>
-                                        <td className="px-6 py-3 font-medium">{formatBRL(item.amount_cents)}</td>
+                                        <td className="px-4 py-3 sm:px-6">{item.description}</td>
+                                        <td className="px-4 py-3 sm:px-6">{item.quantity}</td>
+                                        <td className="px-4 py-3 font-medium whitespace-nowrap sm:px-6">{formatBRL(item.amount_cents)}</td>
                                     </tr>
                                 ))}
                                 {invoice.items.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">
+                                        <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground sm:px-6">
                                             {invoice.description ?? 'Sem itens detalhados'}
                                         </td>
                                     </tr>

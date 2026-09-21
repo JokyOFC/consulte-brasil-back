@@ -141,39 +141,42 @@ export default function AdminFinanceIndex() {
                                 ))}
                             </div>
                         </div>
-                        <table className="w-full text-sm">
-                            <thead className="text-left text-muted-foreground">
-                                <tr className="border-b border-border">
-                                    <th className="px-6 py-3 font-medium">Cliente</th>
-                                    <th className="px-6 py-3 font-medium">Tipo</th>
-                                    <th className="px-6 py-3 font-medium">Método</th>
-                                    <th className="px-6 py-3 font-medium">Valor</th>
-                                    <th className="px-6 py-3 font-medium">Status</th>
-                                    <th className="px-6 py-3 font-medium">Data</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {payments.data.map((p) => (
-                                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                        <td className="px-6 py-3 font-medium">{p.account_name}</td>
-                                        <td className="px-6 py-3 capitalize text-muted-foreground">{p.type}</td>
-                                        <td className="px-6 py-3 capitalize text-muted-foreground">{p.method}</td>
-                                        <td className="px-6 py-3 font-medium">{formatBRL(p.amount_cents)}</td>
-                                        <td className="px-6 py-3">
-                                            <StatusBadge status={p.status} />
-                                        </td>
-                                        <td className="px-6 py-3 text-muted-foreground">{formatDateTime(p.created_at)}</td>
+                        {/* overflow-x-auto: no celular a tabela rola dentro do card em vez de ser cortada. */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[760px] text-sm">
+                                <thead className="text-left text-muted-foreground">
+                                    <tr className="border-b border-border">
+                                        <th className="px-6 py-3 font-medium">Cliente</th>
+                                        <th className="px-6 py-3 font-medium">Tipo</th>
+                                        <th className="px-6 py-3 font-medium">Método</th>
+                                        <th className="px-6 py-3 font-medium">Valor</th>
+                                        <th className="px-6 py-3 font-medium">Status</th>
+                                        <th className="px-6 py-3 font-medium">Data</th>
                                     </tr>
-                                ))}
-                                {payments.data.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                                            Nenhum pagamento encontrado.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {payments.data.map((p) => (
+                                        <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                                            <td className="px-6 py-3 font-medium">{p.account_name}</td>
+                                            <td className="px-6 py-3 capitalize text-muted-foreground">{p.type}</td>
+                                            <td className="px-6 py-3 capitalize text-muted-foreground">{p.method}</td>
+                                            <td className="px-6 py-3 font-medium">{formatBRL(p.amount_cents)}</td>
+                                            <td className="px-6 py-3">
+                                                <StatusBadge status={p.status} />
+                                            </td>
+                                            <td className="px-6 py-3 text-muted-foreground">{formatDateTime(p.created_at)}</td>
+                                        </tr>
+                                    ))}
+                                    {payments.data.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                                                Nenhum pagamento encontrado.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                         <div className="px-6 py-3">
                             <Pagination paginator={payments} />
                         </div>
@@ -181,10 +184,10 @@ export default function AdminFinanceIndex() {
                 </Card>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <Card className="gap-0 py-0">
-                        <CardContent className="p-0">
+                    <Card className="min-w-0 gap-0 py-0">
+                        <CardContent className="overflow-x-auto p-0">
                             <div className="border-b border-border px-6 py-3 text-sm font-semibold">Faturas</div>
-                            <table className="w-full text-sm">
+                            <table className="w-full min-w-[480px] text-sm">
                                 <tbody>
                                     {invoices.map((inv) => (
                                         <tr key={inv.id} className="border-b border-border last:border-0">
@@ -211,10 +214,10 @@ export default function AdminFinanceIndex() {
                         </CardContent>
                     </Card>
 
-                    <Card className="gap-0 py-0">
-                        <CardContent className="p-0">
+                    <Card className="min-w-0 gap-0 py-0">
+                        <CardContent className="overflow-x-auto p-0">
                             <div className="border-b border-border px-6 py-3 text-sm font-semibold">Assinaturas</div>
-                            <table className="w-full text-sm">
+                            <table className="w-full min-w-[480px] text-sm">
                                 <tbody>
                                     {subscriptions.map((s) => (
                                         <tr key={s.id} className="border-b border-border last:border-0">

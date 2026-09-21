@@ -220,7 +220,7 @@ return;
     return (
         <Card className="gap-0 border-brand-green/40 bg-brand-green/5 py-0">
             <CardContent className="space-y-4 p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm font-medium">
                         Cobrança de {formatBRL(payment.amount_cents)} —{' '}
                         {payment.method === 'pix' ? 'PIX' : payment.method === 'boleto' ? 'Boleto' : 'Cartão'}
@@ -237,10 +237,10 @@ return;
                             alt="QR Code PIX"
                             className="size-44 rounded-md border border-border bg-white p-2"
                         />
-                        <div className="w-full space-y-2">
+                        <div className="w-full min-w-0 space-y-2">
                             <Label>PIX copia e cola</Label>
                             <div className="flex items-center gap-2">
-                                <code className="flex-1 overflow-x-auto rounded-md border border-border bg-background px-3 py-2 font-mono text-xs">
+                                <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-background px-3 py-2 font-mono text-xs whitespace-nowrap">
                                     {payment.qr_code}
                                 </code>
                                 <Button variant="outline" size="sm" onClick={() => copy(payment.qr_code ?? '')}>
@@ -304,8 +304,10 @@ function postCardPayment(
 }
 
 function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method) => void }) {
+    // Sempre 3 colunas: no celular os cartões ficam compactos (sem descrição)
+    // em vez de empilhados, para o diálogo não crescer além da tela.
     return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2">
             {PAYMENT_METHODS.map((option) => {
                 const Icon = option.icon;
                 const selected = value === option.id;
@@ -315,8 +317,9 @@ function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method
                         key={option.id}
                         type="button"
                         onClick={() => onChange(option.id)}
+                        aria-pressed={selected}
                         className={cn(
-                            'flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all',
+                            'flex min-w-0 flex-col items-start gap-2 rounded-xl border p-2.5 text-left transition-all sm:p-3',
                             selected
                                 ? 'border-brand-green bg-brand-green/10 ring-2 ring-brand-green/25'
                                 : 'border-border bg-background hover:border-brand-green/40 hover:bg-muted/30',
@@ -328,9 +331,9 @@ function MethodPicker({ value, onChange }: { value: Method; onChange: (m: Method
                             </span>
                             {selected && <Check className="size-4 text-brand-green" />}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <p className="text-sm font-semibold">{option.label}</p>
-                            <p className="text-xs text-muted-foreground">{option.description}</p>
+                            <p className="hidden text-xs text-muted-foreground sm:block">{option.description}</p>
                         </div>
                     </button>
                 );
@@ -371,9 +374,10 @@ function PlanPicker({
                         key={plan.id}
                         type="button"
                         onClick={() => onChange(plan.id)}
+                        aria-pressed={selected}
                         className={cn(
-                            'relative flex flex-col rounded-2xl border p-4 text-left transition-all',
-                            compact ? 'p-3' : 'p-5',
+                            'relative flex min-w-0 flex-col rounded-2xl border text-left transition-all',
+                            compact ? 'p-3' : 'p-4 sm:p-5',
                             selected
                                 ? 'border-brand-green bg-gradient-to-br from-brand-green/10 via-brand-green/5 to-transparent shadow-md ring-2 ring-brand-green/25'
                                 : 'border-border bg-card hover:border-brand-green/40 hover:shadow-sm',
@@ -389,7 +393,7 @@ function PlanPicker({
                             <div>
                                 <p className="font-semibold">{plan.name}</p>
                                 <div className="mt-1 flex items-baseline gap-1">
-                                    <span className={cn('font-bold tabular-nums text-foreground', compact ? 'text-xl' : 'text-3xl')}>
+                                    <span className={cn('font-bold tabular-nums text-foreground', compact ? 'text-xl' : 'text-2xl sm:text-3xl')}>
                                         {formatBRL(plan.price_cents)}
                                     </span>
                                     <span className="text-xs text-muted-foreground">/mês</span>
@@ -402,19 +406,21 @@ function PlanPicker({
                             )}
                         </div>
 
-                        <ul className={cn('space-y-2 text-muted-foreground', compact ? 'mt-3 text-xs' : 'mt-4 text-sm')}>
+                        {/* No diálogo (não compacto), o celular mostra só a recarga para
+                            os 3 planos caberem na tela; os demais itens voltam a partir de sm. */}
+                        <ul className={cn('space-y-2 text-muted-foreground', compact ? 'mt-3 text-xs' : 'mt-3 text-sm sm:mt-4')}>
                             <li className="flex items-center gap-2">
                                 <Zap className="size-3.5 shrink-0 text-brand-green" />
                                 <span>
                                     Recarrega <strong className="text-foreground">{formatBRL(plan.recharge_cents)}</strong> no saldo
                                 </span>
                             </li>
-                            <li className="flex items-center gap-2">
+                            <li className={cn('items-center gap-2', compact ? 'flex' : 'hidden sm:flex')}>
                                 <Repeat className="size-3.5 shrink-0 text-brand-green" />
                                 Renovação automática mensal
                             </li>
                             {!compact && (
-                                <li className="flex items-center gap-2">
+                                <li className="hidden items-center gap-2 sm:flex">
                                     <ShieldCheck className="size-3.5 shrink-0 text-brand-green" />
                                     Cancele quando quiser
                                 </li>
@@ -432,7 +438,8 @@ function TopupDialog() {
     const payerEmail = auth.user?.email ?? '';
     const [open, setOpen] = useState(false);
     const [method, setMethod] = useState<Method>('pix');
-    const form = useForm({ amount: '50,00', method: 'pix' as Method, card_token: '' });
+    // Valor inicial sem vírgula: <input type="number"> rejeita "50,00" e o campo aparecia vazio.
+    const form = useForm({ amount: '50', method: 'pix' as Method, card_token: '' });
     const amountCents = Math.round(parseAmountReais(form.data.amount) * 100);
 
     const submit = (e: FormEvent) => {
@@ -828,8 +835,10 @@ function SubscribeDialog({
     return (
         <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
-                <div className="border-b border-border bg-gradient-to-br from-brand-green/10 via-transparent to-transparent px-6 py-5">
+            {/* Cabeçalho e rodapé fixos; só o miolo rola. Assim o botão de assinar
+                fica sempre visível, em qualquer altura de tela. */}
+            <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+                <div className="shrink-0 border-b border-border bg-gradient-to-br from-brand-green/10 via-transparent to-transparent py-4 pr-12 pl-4 sm:py-5 sm:pl-6">
                     <DialogHeader className="gap-1.5 text-left">
                         <DialogTitle className="text-xl">Escolha seu plano</DialogTitle>
                         <DialogDescription>
@@ -838,68 +847,78 @@ function SubscribeDialog({
                     </DialogHeader>
                 </div>
 
-                <form onSubmit={submit} className="space-y-6 px-6 py-5">
-                    <div className="space-y-3">
-                        <Label className="text-sm font-medium">Planos disponíveis</Label>
-                        <PlanPicker
-                            plans={plans}
-                            value={form.data.plan_id}
-                            onChange={(planId) => form.setData('plan_id', planId)}
-                        />
-                        {form.errors.plan_id && <p className="text-sm text-destructive">{form.errors.plan_id}</p>}
-                    </div>
+                <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5">
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">Planos disponíveis</Label>
+                            <PlanPicker
+                                plans={plans}
+                                value={form.data.plan_id}
+                                onChange={(planId) => form.setData('plan_id', planId)}
+                            />
+                            {form.errors.plan_id && <p className="text-sm text-destructive">{form.errors.plan_id}</p>}
+                        </div>
 
-                    <div className="space-y-3">
-                        <Label className="text-sm font-medium">Como deseja pagar?</Label>
-                        <MethodPicker value={method} onChange={setMethod} />
-                    </div>
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">Como deseja pagar?</Label>
+                            <MethodPicker value={method} onChange={setMethod} />
+                        </div>
 
-                    {selectedPlan && (
-                        <div className="rounded-xl border border-border bg-muted/30 p-4">
-                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Resumo</p>
-                            <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                                <div>
-                                    <p className="font-semibold">{selectedPlan.name}</p>
+                        {selectedPlan && (
+                            <div className="rounded-xl border border-border bg-muted/30 p-4">
+                                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Resumo</p>
+                                <div className="mt-2 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+                                    <div>
+                                        <p className="font-semibold">{selectedPlan.name}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {formatBRL(selectedPlan.price_cents)}/mês via {methodLabel}
+                                        </p>
+                                    </div>
                                     <p className="text-sm text-muted-foreground">
-                                        {formatBRL(selectedPlan.price_cents)}/mês via {methodLabel}
+                                        Saldo: <span className="font-medium text-brand-green">+{formatBRL(selectedPlan.recharge_cents)}</span>/mês
                                     </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                    Saldo: <span className="font-medium text-brand-green">+{formatBRL(selectedPlan.recharge_cents)}</span>/mês
-                                </p>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {method === 'credit_card' && selectedPlan && (
-                        <MercadoPagoCardForm
-                            publicKey={mp_public_key}
-                            amountCents={selectedPlan.price_cents}
-                            payerEmail={payerEmail}
-                            maxInstallments={1}
-                            submitLabel="Assinar com cartão"
-                            onSubmit={(token) =>
-                                postCardPayment(
-                                    '/client/billing/subscribe',
-                                    {
-                                        plan_id: form.data.plan_id,
-                                        method: 'credit_card',
-                                        ...token,
-                                    },
-                                    () => setDialogOpen(false),
-                                )
-                            }
-                        />
-                    )}
+                        {method === 'credit_card' && selectedPlan && (
+                            <MercadoPagoCardForm
+                                publicKey={mp_public_key}
+                                amountCents={selectedPlan.price_cents}
+                                payerEmail={payerEmail}
+                                maxInstallments={1}
+                                submitLabel="Assinar com cartão"
+                                onSubmit={(token) =>
+                                    postCardPayment(
+                                        '/client/billing/subscribe',
+                                        {
+                                            plan_id: form.data.plan_id,
+                                            method: 'credit_card',
+                                            ...token,
+                                        },
+                                        () => setDialogOpen(false),
+                                    )
+                                }
+                            />
+                        )}
+                    </div>
 
-                    <DialogFooter className="gap-2 border-t border-border px-0 pt-4 sm:justify-between">
-                        <p className="text-xs text-muted-foreground">
+                    <DialogFooter className="shrink-0 items-center gap-2 border-t border-border bg-background px-4 py-3 sm:justify-between sm:px-6 sm:py-4">
+                        <p className="hidden text-xs text-muted-foreground sm:block">
                             Você pode cancelar a assinatura a qualquer momento.
                         </p>
-                        {method !== 'credit_card' && (
-                            <Button type="submit" disabled={form.processing || plans.length === 0} className="min-w-36">
+                        {method !== 'credit_card' ? (
+                            <Button
+                                type="submit"
+                                disabled={form.processing || plans.length === 0}
+                                className="w-full sm:w-auto sm:min-w-36"
+                            >
                                 {form.processing ? 'Processando…' : 'Assinar agora'}
                             </Button>
+                        ) : (
+                            <p className="text-center text-xs text-muted-foreground sm:text-right">
+                                Preencha os dados do cartão acima para assinar.
+                            </p>
                         )}
                     </DialogFooter>
                 </form>
@@ -930,8 +949,8 @@ function ChangePlanDialog({ subscriptionId, plans }: { subscriptionId: string; p
             <DialogTrigger asChild>
                 <Button variant="outline">Alterar plano</Button>
             </DialogTrigger>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
-                <div className="border-b border-border px-6 py-5">
+            <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+                <div className="shrink-0 border-b border-border py-4 pr-12 pl-4 sm:py-5 sm:pl-6">
                     <DialogHeader className="text-left">
                         <DialogTitle>Alterar plano</DialogTitle>
                         <DialogDescription>
@@ -939,21 +958,23 @@ function ChangePlanDialog({ subscriptionId, plans }: { subscriptionId: string; p
                         </DialogDescription>
                     </DialogHeader>
                 </div>
-                <form onSubmit={submit} className="space-y-5 px-6 py-5">
-                    <PlanPicker
-                        plans={plans}
-                        value={form.data.plan_id}
-                        onChange={(planId) => form.setData('plan_id', planId)}
-                    />
-                    {selectedPlan && (
-                        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-                            Novo valor: <span className="font-semibold text-foreground">{formatBRL(selectedPlan.price_cents)}/mês</span>
-                            {' · '}
-                            Recarga: <span className="font-semibold text-brand-green">{formatBRL(selectedPlan.recharge_cents)}</span>
-                        </div>
-                    )}
-                    <DialogFooter className="border-t border-border px-0 pt-4">
-                        <Button type="submit" disabled={form.processing}>
+                <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                        <PlanPicker
+                            plans={plans}
+                            value={form.data.plan_id}
+                            onChange={(planId) => form.setData('plan_id', planId)}
+                        />
+                        {selectedPlan && (
+                            <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                                Novo valor: <span className="font-semibold text-foreground">{formatBRL(selectedPlan.price_cents)}/mês</span>
+                                {' · '}
+                                Recarga: <span className="font-semibold text-brand-green">{formatBRL(selectedPlan.recharge_cents)}</span>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6 sm:py-4">
+                        <Button type="submit" disabled={form.processing} className="w-full sm:w-auto">
                             Confirmar alteração
                         </Button>
                     </DialogFooter>
@@ -963,61 +984,73 @@ function ChangePlanDialog({ subscriptionId, plans }: { subscriptionId: string; p
     );
 }
 
+/** Colunas (sm+) de "Faturas em aberto": descrição flexível + larguras fixas para alinhar as linhas. */
+const INVOICE_GRID_COLS = 'sm:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_6.5rem_10.5rem]';
+
 function InvoicesCard({ invoices }: { invoices: Invoice[] }) {
     return (
         <Card className="gap-0 py-0">
             <CardContent className="p-0">
-                <div className="flex items-center justify-between border-b border-border px-6 py-3">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
                     <span className="text-sm font-semibold">Faturas em aberto</span>
                     <Button variant="ghost" size="sm" asChild>
                         <Link href="/client/invoices">Ver todas</Link>
                     </Button>
                 </div>
-                <table className="w-full text-sm">
-                    <thead className="text-left text-muted-foreground">
-                        <tr className="border-b border-border">
-                            <th className="px-6 py-3 font-medium">Descrição</th>
-                            <th className="px-6 py-3 font-medium">Vencimento</th>
-                            <th className="px-6 py-3 font-medium">Valor</th>
-                            <th className="px-6 py-3 font-medium">Status</th>
-                            <th className="px-6 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invoices.map((inv) => (
-                            <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                                <td className="px-6 py-3">{inv.description ?? 'Fatura'}</td>
-                                <td className="px-6 py-3 text-muted-foreground">{inv.due_date ?? '—'}</td>
-                                <td className="px-6 py-3 font-medium">{formatBRL(inv.amount_cents)}</td>
-                                <td className="px-6 py-3">
-                                    <Badge
-                                        variant="outline"
-                                        className={
-                                            inv.status === 'overdue'
-                                                ? 'border-transparent bg-red-100 text-red-700'
-                                                : 'border-transparent bg-amber-100 text-amber-700'
-                                        }
-                                    >
-                                        {inv.status === 'overdue' ? 'Vencida' : 'Em aberto'}
-                                    </Badge>
-                                </td>
-                                <td className="px-6 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <CancelInvoiceButton invoice={inv} />
-                                        <PayInvoiceDialog invoice={inv} />
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {invoices.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                                    Nenhuma fatura em aberto.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+
+                {/* Grade em vez de <table>: no celular cada fatura vira um bloco com os
+                    botões Cancelar/Pagar em largura total; a partir de sm, colunas alinhadas. */}
+                <div
+                    className={cn(
+                        'hidden border-b border-border px-6 py-3 text-sm font-medium text-muted-foreground sm:grid sm:gap-x-4',
+                        INVOICE_GRID_COLS,
+                    )}
+                >
+                    <span>Descrição</span>
+                    <span>Vencimento</span>
+                    <span>Valor</span>
+                    <span>Status</span>
+                    <span />
+                </div>
+                <ul className="divide-y divide-border text-sm">
+                    {invoices.map((inv) => (
+                        <li
+                            key={inv.id}
+                            className={cn(
+                                'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-4 hover:bg-muted/40 sm:px-6 sm:py-3',
+                                INVOICE_GRID_COLS,
+                            )}
+                        >
+                            <p className="min-w-0 truncate font-medium sm:font-normal">{inv.description ?? 'Fatura'}</p>
+                            <p className="order-3 text-muted-foreground sm:order-none">
+                                <span className="sm:hidden">Vence em </span>
+                                {formatBillingDate(inv.due_date)}
+                            </p>
+                            <p className="order-4 text-right font-medium tabular-nums sm:order-none sm:text-left">
+                                {formatBRL(inv.amount_cents)}
+                            </p>
+                            <div className="order-2 justify-self-end sm:order-none sm:justify-self-start">
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        inv.status === 'overdue'
+                                            ? 'border-transparent bg-red-100 text-red-700'
+                                            : 'border-transparent bg-amber-100 text-amber-700'
+                                    }
+                                >
+                                    {inv.status === 'overdue' ? 'Vencida' : 'Em aberto'}
+                                </Badge>
+                            </div>
+                            <div className="order-5 col-span-2 flex items-center gap-2 pt-1 sm:order-none sm:col-span-1 sm:justify-end sm:pt-0 [&>button]:flex-1 sm:[&>button]:flex-none">
+                                <CancelInvoiceButton invoice={inv} />
+                                <PayInvoiceDialog invoice={inv} />
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+                {invoices.length === 0 && (
+                    <p className="px-6 py-10 text-center text-sm text-muted-foreground">Nenhuma fatura em aberto.</p>
+                )}
             </CardContent>
         </Card>
     );
@@ -1178,29 +1211,31 @@ function HistoryCard({ title, rows }: { title: string; rows: PaymentRow[] }) {
             cancelled: 'Cancelado',
         })[s] ?? s;
 
+    const methodLabel = (m: string) => ({ pix: 'PIX', boleto: 'Boleto', credit_card: 'Cartão' })[m] ?? m;
+
+    // Lista em duas linhas (método/data à esquerda, valor/status à direita):
+    // cabe em qualquer largura, sem rolagem lateral no celular.
     return (
-        <Card className="gap-0 py-0">
+        <Card className="min-w-0 gap-0 py-0">
             <CardContent className="p-0">
-                <div className="border-b border-border px-6 py-3 text-sm font-semibold">{title}</div>
-                <table className="w-full text-sm">
-                    <tbody>
-                        {rows.map((p) => (
-                            <tr key={p.id} className="border-b border-border last:border-0">
-                                <td className="px-6 py-3 text-muted-foreground">{formatDateTime(p.created_at)}</td>
-                                <td className="px-6 py-3 capitalize">{p.method}</td>
-                                <td className="px-6 py-3 font-medium">{formatBRL(p.amount_cents)}</td>
-                                <td className="px-6 py-3 text-right text-muted-foreground">{label(p.status)}</td>
-                            </tr>
-                        ))}
-                        {rows.length === 0 && (
-                            <tr>
-                                <td className="px-6 py-10 text-center text-sm text-muted-foreground">
-                                    Nenhum pagamento ainda.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                <div className="border-b border-border px-4 py-3 text-sm font-semibold sm:px-6">{title}</div>
+                <ul className="divide-y divide-border text-sm">
+                    {rows.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                            <div className="min-w-0">
+                                <p className="font-medium">{methodLabel(p.method)}</p>
+                                <p className="text-xs text-muted-foreground">{formatDateTime(p.created_at)}</p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                                <p className="font-medium tabular-nums">{formatBRL(p.amount_cents)}</p>
+                                <p className="text-xs text-muted-foreground">{label(p.status)}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+                {rows.length === 0 && (
+                    <p className="px-6 py-10 text-center text-sm text-muted-foreground">Nenhum pagamento ainda.</p>
+                )}
             </CardContent>
         </Card>
     );
@@ -1208,32 +1243,31 @@ function HistoryCard({ title, rows }: { title: string; rows: PaymentRow[] }) {
 
 function TransactionsCard({ rows }: { rows: Transaction[] }) {
     return (
-        <Card className="gap-0 py-0">
+        <Card className="min-w-0 gap-0 py-0">
             <CardContent className="p-0">
-                <div className="border-b border-border px-6 py-3 text-sm font-semibold">Extrato da carteira</div>
-                <table className="w-full text-sm">
-                    <tbody>
-                        {rows.map((t, i) => (
-                            <tr key={i} className="border-b border-border last:border-0">
-                                <td className="px-6 py-3 text-muted-foreground">{formatDateTime(t.created_at)}</td>
-                                <td className="px-6 py-3 capitalize">{t.type}</td>
-                                <td
-                                    className={`px-6 py-3 text-right font-medium ${t.direction === 'credit' ? 'text-brand-green' : 'text-foreground'}`}
-                                >
-                                    {t.direction === 'credit' ? '+' : '−'}
-                                    {formatBRL(t.amount_cents)}
-                                </td>
-                            </tr>
-                        ))}
-                        {rows.length === 0 && (
-                            <tr>
-                                <td className="px-6 py-10 text-center text-sm text-muted-foreground">
-                                    Sem movimentações.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                <div className="border-b border-border px-4 py-3 text-sm font-semibold sm:px-6">Extrato da carteira</div>
+                <ul className="divide-y divide-border text-sm">
+                    {rows.map((t, i) => (
+                        <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                            <div className="min-w-0">
+                                <p className="font-medium capitalize">{t.type}</p>
+                                <p className="text-xs text-muted-foreground">{formatDateTime(t.created_at)}</p>
+                            </div>
+                            <p
+                                className={cn(
+                                    'shrink-0 font-medium tabular-nums',
+                                    t.direction === 'credit' ? 'text-brand-green' : 'text-foreground',
+                                )}
+                            >
+                                {t.direction === 'credit' ? '+' : '−'}
+                                {formatBRL(t.amount_cents)}
+                            </p>
+                        </li>
+                    ))}
+                </ul>
+                {rows.length === 0 && (
+                    <p className="px-6 py-10 text-center text-sm text-muted-foreground">Sem movimentações.</p>
+                )}
             </CardContent>
         </Card>
     );
